@@ -149,7 +149,7 @@ export const executeTask = async (task: Task): Promise<string> => {
     try {
         const response = await callGeminiWithRetry(async () => {
             return await ai.models.generateContent({
-                model: 'gem-2.5-flash',
+                model: 'gemini-2.5-flash',
                 contents: prompt,
                 config: {
                     systemInstruction,
