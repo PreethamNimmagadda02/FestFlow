@@ -60,3 +60,8 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 2. Set the `VITE_GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+
+ ## Interaction logs
+
+Link: https://g.co/gemini/share/2e14e9709d5d
