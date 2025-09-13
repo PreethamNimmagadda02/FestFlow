@@ -35,10 +35,12 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 * **React**: A popular and robust JavaScript library for building user interfaces. Its component-based architecture is a perfect fit for creating a modular and maintainable application.
 * **Tailwind CSS**: A utility-first CSS framework that enables rapid styling without leaving the HTML. This accelerates the development process and ensures a consistent design language across the application.
 * **Google Gemini API**: A powerful large language model that serves as the application's intelligent backend. It handles the complex tasks of goal decomposition and content generation, allowing the application to deliver sophisticated AI-driven features without a complex server-side implementation.
-* **Vite**: A next-generation frontend build tool that offers an extremely fast development server and optimized build process. This enhances developer productivity and improves the overall performance of the application.## Run Locally
+* **Vite**: A next-generation frontend build tool that offers an extremely fast development server and optimized build process. This enhances developer productivity and improves the overall performance of the application.
+
+
+## Run Locally
 
 **Prerequisites:**  Node.js
-
 
 1. Install dependencies:
    `npm install`
