@@ -1,54 +1,92 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
-import { FestivalSetupForm } from './components/FestivalSetupForm';
+import { EventSetupForm } from './components/FestivalSetupForm';
 import { Dashboard } from './components/Dashboard';
 import { AgentName, Task, Approval, ActivityLog, AgentStatus, TaskStatus } from './types';
 import { AGENT_NAMES, MAX_TASK_RETRIES } from './constants';
 import { decomposeGoal, executeTask } from './services/geminiService';
 
+const getInitialState = <T,>(key: string, defaultValue: T): T => {
+    try {
+        const storedValue = localStorage.getItem(key);
+        if (storedValue) {
+            const parsed = JSON.parse(storedValue);
+            if (key === 'festflow_logs' && Array.isArray(parsed)) {
+                return parsed.map((log: any) => ({ ...log, timestamp: new Date(log.timestamp) })) as T;
+            }
+            return parsed;
+        }
+    } catch (error) {
+        console.error(`Error reading localStorage key “${key}”:`, error);
+    }
+    return defaultValue;
+};
+
 const App: React.FC = () => {
-    const [tasks, setTasks] = useState<Task[]>([]);
-    const [approvals, setApprovals] = useState<Approval[]>([]);
-    const [logs, setLogs] = useState<ActivityLog[]>([]);
+    const initialAgentStatus = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: AgentStatus.IDLE}), {} as Record<AgentName, AgentStatus>);
+    const initialAgentWork = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: null}), {} as Record<AgentName, string | null>);
+    
+    const [tasks, setTasks] = useState<Task[]>(() => getInitialState('festflow_tasks', []));
+    const [approvals, setApprovals] = useState<Approval[]>(() => getInitialState('festflow_approvals', []));
+    const [logs, setLogs] = useState<ActivityLog[]>(() => getInitialState('festflow_logs', []));
+    const [agentStatus, setAgentStatus] = useState<Record<AgentName, AgentStatus>>(() => getInitialState('festflow_agentStatus', initialAgentStatus));
+    const [agentWork, setAgentWork] = useState<Record<AgentName, string | null>>(() => getInitialState('festflow_agentWork', initialAgentWork));
+    const [isStarted, setIsStarted] = useState<boolean>(() => getInitialState('festflow_isStarted', false));
+
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [agentStatus, setAgentStatus] = useState<Record<AgentName, AgentStatus>>({
-        [AgentName.MASTER_PLANNER]: AgentStatus.IDLE,
-        [AgentName.LOGISTICS_COORDINATOR]: AgentStatus.IDLE,
-        [AgentName.SPONSORSHIP_OUTREACH]: AgentStatus.IDLE,
-        [AgentName.MARKETING]: AgentStatus.IDLE,
-    });
-    const [agentWork, setAgentWork] = useState<Record<AgentName, string | null>>({
-        [AgentName.MASTER_PLANNER]: null,
-        [AgentName.LOGISTICS_COORDINATOR]: null,
-        [AgentName.SPONSORSHIP_OUTREACH]: null,
-        [AgentName.MARKETING]: null,
-    });
-    const [isStarted, setIsStarted] = useState<boolean>(false);
     const progressIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
     const processingTasks = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('festflow_tasks', JSON.stringify(tasks));
+            localStorage.setItem('festflow_approvals', JSON.stringify(approvals));
+            localStorage.setItem('festflow_logs', JSON.stringify(logs));
+            localStorage.setItem('festflow_agentStatus', JSON.stringify(agentStatus));
+            localStorage.setItem('festflow_agentWork', JSON.stringify(agentWork));
+            localStorage.setItem('festflow_isStarted', JSON.stringify(isStarted));
+        } catch (e) {
+            console.error("Failed to save state to local storage", e);
+        }
+    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted]);
     
     const addLog = useCallback((agent: AgentName, message: string) => {
         setLogs(prev => [...prev, { agent, message, timestamp: new Date() }]);
     }, []);
 
-    const handleGoalSubmit = useCallback(async (goal: string) => {
-        setIsLoading(true);
-        setError(null);
+    const handleReset = useCallback(() => {
         setTasks([]);
         setApprovals([]);
         setLogs([]);
+        setAgentStatus(initialAgentStatus);
+        setAgentWork(initialAgentWork);
+        setIsStarted(false);
+        setError(null);
+        setIsLoading(false);
+        processingTasks.current.clear();
+        Object.values(progressIntervals.current).forEach(clearInterval);
+        progressIntervals.current = {};
+        
+        localStorage.removeItem('festflow_tasks');
+        localStorage.removeItem('festflow_approvals');
+        localStorage.removeItem('festflow_logs');
+        localStorage.removeItem('festflow_agentStatus');
+        localStorage.removeItem('festflow_agentWork');
+        localStorage.removeItem('festflow_isStarted');
+    }, [initialAgentStatus, initialAgentWork]);
+
+    const handleGoalSubmit = useCallback(async (goal: string) => {
+        handleReset(); // Clear previous state for a fresh start
+        setIsLoading(true);
+        setError(null);
+        
+        // Use a functional update to ensure isStarted is set after other state resets
         setIsStarted(true);
 
-        const initialAgentStatus = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: AgentStatus.IDLE}), {} as Record<AgentName, AgentStatus>);
-        setAgentStatus(initialAgentStatus);
-        const initialAgentWork = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: null}), {} as Record<AgentName, string | null>);
-        setAgentWork(initialAgentWork);
-
-
-        addLog(AgentName.MASTER_PLANNER, 'Received new festival goal. Starting decomposition...');
+        addLog(AgentName.MASTER_PLANNER, 'Received new event goal. Starting decomposition...');
         setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.WORKING }));
-        setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: "Decomposing festival goal..." }));
+        setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: "Decomposing event goal..." }));
 
         try {
             const decomposedTasks = await decomposeGoal(goal);
@@ -56,7 +94,7 @@ const App: React.FC = () => {
             setTasks(decomposedTasks);
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-            setError(`Failed to decompose goal: ${errorMessage}`);
+            setError(errorMessage);
             addLog(AgentName.MASTER_PLANNER, `Error: ${errorMessage}`);
             setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.ERROR }));
         } finally {
@@ -64,7 +102,7 @@ const App: React.FC = () => {
             setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.IDLE }));
             setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: null }));
         }
-    }, [addLog]);
+    }, [addLog, handleReset]);
 
     const processTask = useCallback(async (task: Task) => {
         if (processingTasks.current.has(task.id)) return;
@@ -133,8 +171,9 @@ const App: React.FC = () => {
                 clearInterval(progressIntervals.current[task.id]);
                 delete progressIntervals.current[task.id];
                 
+                // Task work is finished, but it now waits for the user to manually mark it as complete.
                 setTasks(prev => prev.map(t => t.id === task.id ? {...t, progress: 100} : t));
-                addLog(task.assignedTo, `Work complete for "${task.title}". Ready for user to mark as complete.`);
+                addLog(task.assignedTo, `Task "${task.title}" work is finished. Awaiting manual completion.`);
                 setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.IDLE}));
                 setAgentWork(prev => ({...prev, [task.assignedTo]: null}));
                 processingTasks.current.delete(task.id);
@@ -143,6 +182,20 @@ const App: React.FC = () => {
 
     }, [addLog]);
 
+    useEffect(() => {
+        const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
+        const tasksToStart = tasks.filter(task => 
+            task.status === TaskStatus.PENDING && 
+            (!task.dependsOn || task.dependsOn.every(depId => completedTaskIds.has(depId)))
+        );
+
+        if (tasksToStart.length > 0) {
+            addLog(AgentName.MASTER_PLANNER, `Dependencies met for ${tasksToStart.length} task(s). Starting now.`);
+            setTasks(prevTasks => prevTasks.map(t => 
+                tasksToStart.some(startTask => startTask.id === t.id) ? { ...t, status: TaskStatus.IN_PROGRESS } : t
+            ));
+        }
+    }, [tasks, addLog]);
 
     useEffect(() => {
         const tasksToProcess = tasks.filter(t =>
@@ -235,10 +288,8 @@ const App: React.FC = () => {
         
         addLog(newAgent, `Task "${taskToReassign.title}" has been reassigned to me. Resetting and starting work.`);
         
-        // Reset the old agent's status from ERROR to IDLE
         setAgentStatus(prev => ({...prev, [oldAgent]: AgentStatus.IDLE}));
 
-        // Reassign the task and reset its state
         setTasks(prev => prev.map(t => 
             t.id === taskId 
             ? { ...t, assignedTo: newAgent, status: TaskStatus.IN_PROGRESS, progress: 0, retries: 0 } 
@@ -246,12 +297,11 @@ const App: React.FC = () => {
         ));
     }, [tasks, addLog]);
 
-
     return (
         <div className="min-h-screen bg-primary text-light flex flex-col">
-            <Header />
+            <Header onReset={handleReset} />
             <main className="flex-grow p-4 md:p-8 space-y-8">
-                <FestivalSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
+                <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
                 {error && <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg animate-fadeIn">{error}</div>}
                 {isStarted && (
                     <Dashboard

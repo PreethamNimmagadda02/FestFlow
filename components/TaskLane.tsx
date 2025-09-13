@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Task, AgentName, TaskStatus, AgentStatus } from '../types';
 import { AGENT_DETAILS, TASK_STATUS_STYLES, MAX_TASK_RETRIES, AGENT_NAMES } from '../constants';
+import { CheckCircleIcon } from './icons/CheckCircleIcon';
+import { ClockIcon } from './icons/ClockIcon';
 
 interface TaskLaneProps {
     agentName: AgentName;
@@ -49,7 +51,7 @@ const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({
     );
 });
 
-const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
+const TaskDetailModal: React.FC<{ task: Task; allTasks: Task[]; onClose: () => void }> = React.memo(({ task, allTasks, onClose }) => {
     const agentDetail = AGENT_DETAILS[task.assignedTo];
     const isRetrying = task.status === TaskStatus.IN_PROGRESS && (task.retries || 0) > 0;
     const statusStyle = isRetrying ? TASK_STATUS_STYLES['Retrying'] : TASK_STATUS_STYLES[task.status];
@@ -89,6 +91,29 @@ const TaskDetailModal: React.FC<{ task: Task; onClose: () => void }> = React.mem
                         <h4 className="text-sm font-semibold text-text-secondary mb-2">Description</h4>
                         <p className="text-light whitespace-pre-wrap font-sans text-sm bg-primary p-3 rounded-lg border border-accent">{task.description}</p>
                     </div>
+
+                    {task.dependsOn && task.dependsOn.length > 0 && (
+                        <div>
+                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Dependencies</h4>
+                            <ul className="space-y-2 bg-primary p-3 rounded-lg border border-accent">
+                                {task.dependsOn.map(depId => {
+                                    const depTask = allTasks.find(t => t.id === depId);
+                                    const isCompleted = depTask?.status === TaskStatus.COMPLETED;
+                                    return (
+                                        <li key={depId} className={`flex items-center text-sm ${isCompleted ? 'text-light' : 'text-text-secondary'}`}>
+                                            {isCompleted ? 
+                                                <CheckCircleIcon className="w-4 h-4 mr-2 text-success flex-shrink-0" /> : 
+                                                <ClockIcon className="w-4 h-4 mr-2 text-yellow-300 flex-shrink-0" />
+                                            }
+                                            <span className={isCompleted ? 'line-through' : ''}>
+                                                {depTask ? depTask.title : 'Unknown Task'}
+                                            </span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+                        </div>
+                    )}
                 </div>
                  <div className="p-4 border-t border-accent text-right">
                     <button 
@@ -206,6 +231,8 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
     const Icon = agentDetail.icon;
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     
+    const tasksForLane = tasks.filter(t => t.assignedTo === agentName);
+
     return (
         <div className="bg-secondary p-4 rounded-xl flex flex-col h-full border border-accent">
             <div className="flex items-center space-x-3 mb-4 p-2 border-b border-accent">
@@ -213,10 +240,10 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
                 <h3 className="font-bold text-lg text-light">{agentName}</h3>
             </div>
             <div className="space-y-4 overflow-y-auto flex-grow pr-1 -mr-2">
-                 {tasks.length === 0 ? (
+                 {tasksForLane.length === 0 ? (
                     <p className="text-text-secondary text-sm p-4 text-center">No tasks assigned.</p>
                 ) : (
-                    tasks.map(task => <TaskCard 
+                    tasksForLane.map(task => <TaskCard 
                         key={task.id} 
                         task={task} 
                         onComplete={onCompleteTask}
@@ -226,7 +253,7 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
                     />)
                 )}
             </div>
-            {selectedTask && <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
+            {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} />}
         </div>
     );
 });

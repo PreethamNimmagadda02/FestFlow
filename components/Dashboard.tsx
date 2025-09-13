@@ -1,9 +1,66 @@
-import React, { useMemo } from 'react';
-import { Task, Approval, ActivityLog, AgentName, AgentStatus, TaskStatus } from '../types';
-import { AgentActivityFeed } from './AgentActivityFeed';
+import React, { useState } from 'react';
+import { Task, Approval, ActivityLog, AgentName, AgentStatus } from '../types';
+import { AGENT_NAMES, AGENT_DETAILS, AGENT_STATUS_STYLES } from '../constants';
 import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
-import { AGENT_NAMES, AGENT_STATUS_STYLES, AGENT_DETAILS } from '../constants';
+import { AgentActivityFeed } from './AgentActivityFeed';
+import { GanttChart } from './GanttChart';
+import { GanttChartIcon } from './icons/GanttChartIcon';
+
+// This icon is needed for the Kanban view toggle, but the file doesn't exist.
+// Since new files cannot be added, it's defined here.
+const ColumnsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M12 3v18" />
+    </svg>
+);
+
+interface AgentStatusGridProps {
+    agentStatus: Record<AgentName, AgentStatus>;
+    agentWork: Record<AgentName, string | null>;
+}
+
+const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatus, agentWork }) => {
+    return (
+        <div className="bg-secondary p-4 rounded-xl h-96 shadow-inner border border-accent flex flex-col">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow overflow-y-auto pr-2 -mr-3">
+                {AGENT_NAMES.map(agentName => {
+                    const status = agentStatus[agentName];
+                    const work = agentWork[agentName];
+                    const agentDetail = AGENT_DETAILS[agentName];
+                    const statusStyle = AGENT_STATUS_STYLES[status];
+                    const AgentIcon = agentDetail.icon;
+                    const StatusIcon = statusStyle.icon;
+
+                    return (
+                        <div key={agentName} className="bg-primary p-4 rounded-lg border border-accent flex flex-col justify-between">
+                            <div>
+                                <div className="flex items-center space-x-3 mb-2">
+                                    <AgentIcon className={`w-6 h-6 ${agentDetail.color}`} />
+                                    <h4 className="font-bold text-light truncate">{agentName}</h4>
+                                </div>
+                                <p className="text-xs text-text-secondary mb-3">{agentDetail.description}</p>
+                            </div>
+                            <div>
+                                 <div className={`flex items-center text-sm font-semibold ${statusStyle.color}`}>
+                                    {StatusIcon && <StatusIcon className={`w-4 h-4 mr-2 ${status === AgentStatus.WORKING ? 'animate-spin' : ''}`} />}
+                                    <span>{status}</span>
+                                </div>
+                                {work && (
+                                    <p className="text-xs text-text-secondary mt-1 bg-secondary px-2 py-1 rounded-md truncate" title={work}>
+                                        Task: {work}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+});
+
 
 interface DashboardProps {
     tasks: Task[];
@@ -11,133 +68,90 @@ interface DashboardProps {
     logs: ActivityLog[];
     agentStatus: Record<AgentName, AgentStatus>;
     agentWork: Record<AgentName, string | null>;
-    onApproval: (approvalId: string, decision: 'approved' | 'rejected', content?: string) => void;
+    onApproval: (approvalId: string, decision: 'approved' | 'rejected', newContent?: string) => void;
     onCompleteTask: (taskId: string) => void;
     onReassignTask: (taskId: string, newAgent: AgentName) => void;
 }
 
-interface AgentStatusIndicatorProps {
-    name: AgentName;
-    status: AgentStatus;
-    currentTask: string | null;
-}
-
-const AgentStatusIndicator: React.FC<AgentStatusIndicatorProps> = React.memo(({ name, status, currentTask }) => {
-    const statusStyle = AGENT_STATUS_STYLES[status];
-    const agentDetail = AGENT_DETAILS[name];
-    const StatusIcon = statusStyle.icon;
-
-    return (
-        <div className="w-full flex flex-col justify-between h-full">
-            <div>
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                         <agentDetail.icon className={`w-5 h-5 ${agentDetail.color}`} />
-                         <span className="font-bold text-sm">{name}</span>
-                    </div>
-                    <div className={`flex items-center space-x-2 text-xs font-bold px-2 py-1 rounded-full ${status === AgentStatus.WORKING ? 'bg-success/20 text-success' : status === AgentStatus.ERROR ? 'bg-danger/20 text-danger' : 'bg-accent text-text-secondary'}`}>
-                        {StatusIcon && <StatusIcon className={`w-4 h-4 ${status === AgentStatus.WORKING ? 'animate-pulse' : ''}`}/>}
-                        <span>{status}</span>
-                    </div>
-                </div>
-            </div>
-            {status === AgentStatus.WORKING && currentTask ? (
-                <p className="text-xs text-text-secondary italic mt-2 truncate" title={currentTask}>
-                   Working on: {currentTask}
-                </p>
-            ) : <p className="text-xs text-text-secondary italic mt-2">{agentDetail.description}</p>
-            }
-        </div>
-    );
-});
-
-
-export const Dashboard: React.FC<DashboardProps> = React.memo(({ tasks, approvals, logs, agentStatus, agentWork, onApproval, onCompleteTask, onReassignTask }) => {
-    const pendingApprovals = approvals.filter(a => a.status === 'pending');
+export const Dashboard: React.FC<DashboardProps> = ({
+    tasks,
+    approvals,
+    logs,
+    agentStatus,
+    agentWork,
+    onApproval,
+    onCompleteTask,
+    onReassignTask
+}) => {
+    const [view, setView] = useState<'kanban' | 'gantt'>('kanban');
     
-    const { completedProgress, overallProgress, completedTasksCount, totalTasksCount } = useMemo(() => {
-        const completedCount = tasks.filter(t => t.status === TaskStatus.COMPLETED).length;
-        const totalCount = tasks.length;
-        
-        const completed = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-        
-        const totalSum = tasks.reduce((acc, task) => {
-            if (task.status === TaskStatus.COMPLETED) return acc + 100;
-            return acc + (task.progress || 0);
-        }, 0);
-        
-        const overall = totalCount > 0 ? totalSum / totalCount : 0;
-
-        return {
-            completedProgress: completed,
-            overallProgress: overall,
-            completedTasksCount: completedCount,
-            totalTasksCount: totalCount
-        };
-    }, [tasks]);
-
+    const pendingApprovals = approvals.filter(a => a.status === 'pending');
 
     return (
-        <div className="space-y-8 animate-fadeIn" style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}>
+        <div className="space-y-8 animate-fadeIn">
             <div>
-                <h2 className="text-xl font-bold mb-4 text-highlight">2. System Status & Progress</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    {AGENT_NAMES.map(name => (
-                         <div key={name} className="bg-secondary p-4 rounded-xl flex flex-col justify-center min-h-[90px] border border-accent">
-                            <AgentStatusIndicator name={name} status={agentStatus[name]} currentTask={agentWork[name]} />
-                         </div>
-                    ))}
+                <h2 className="text-xl font-bold mb-4 text-highlight">2. Monitor Agent Status & Activity</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                    <div className="lg:col-span-3">
+                         <AgentStatusGrid agentStatus={agentStatus} agentWork={agentWork} />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <AgentActivityFeed logs={logs} />
+                    </div>
                 </div>
-                 <div className="bg-secondary p-4 rounded-xl border border-accent">
-                     <h3 className="font-semibold mb-2 text-light">Overall Progress ({completedTasksCount}/{totalTasksCount} tasks completed)</h3>
-                     <div className="w-full bg-primary rounded-full h-4 overflow-hidden border border-accent relative">
-                         <div 
-                            className="absolute top-0 left-0 h-full bg-accent transition-all duration-500"
-                            style={{width: `${overallProgress}%`}}
-                            title={`Total work in progress: ${overallProgress.toFixed(0)}%`}
-                            ></div>
-                         <div 
-                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-highlight to-violet-500 rounded-full transition-all duration-500" 
-                            style={{width: `${completedProgress}%`}}
-                            title={`Completed: ${completedProgress.toFixed(0)}%`}
-                            ></div>
-                     </div>
-                 </div>
             </div>
 
             {pendingApprovals.length > 0 && (
                 <div>
-                    <h2 className="text-xl font-bold mb-4 text-highlight">3. Action Required: Approvals</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <h2 className="text-xl font-bold mb-4 text-highlight flex items-center">
+                        <span className="mr-2" role="img" aria-label="alarm">🚨</span> 3. Action Required: Approvals
+                    </h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {pendingApprovals.map(approval => (
                             <ApprovalCard key={approval.id} approval={approval} onDecision={onApproval} />
                         ))}
                     </div>
                 </div>
             )}
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <h2 className="text-xl font-bold mb-4 text-highlight">Task Board</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {AGENT_NAMES.map(agentName => {
-                             if (agentName === AgentName.MASTER_PLANNER) return null;
-                             return <TaskLane 
-                                key={agentName} 
-                                agentName={agentName} 
-                                tasks={tasks.filter(t => t.assignedTo === agentName)} 
-                                onCompleteTask={onCompleteTask} 
-                                agentStatus={agentStatus}
-                                onReassign={onReassignTask}
-                             />
-                        })}
+
+            <div>
+                 <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-highlight">{pendingApprovals.length > 0 ? '4.' : '3.'} Task Progress</h2>
+                    <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
+                        <button 
+                            onClick={() => setView('kanban')}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                        >
+                            <ColumnsIcon className="w-4 h-4 inline-block mr-2" />
+                            Kanban
+                        </button>
+                         <button 
+                            onClick={() => setView('gantt')}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                        >
+                            <GanttChartIcon className="w-4 h-4 inline-block mr-2" />
+                            Gantt
+                        </button>
                     </div>
                 </div>
-                <div>
-                    <h2 className="text-xl font-bold mb-4 text-highlight">Activity Feed</h2>
-                    <AgentActivityFeed logs={logs} />
-                </div>
+
+                {view === 'kanban' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                        {AGENT_NAMES.filter(name => name !== AgentName.MASTER_PLANNER).map(agentName => (
+                            <TaskLane
+                                key={agentName}
+                                agentName={agentName}
+                                tasks={tasks}
+                                onCompleteTask={onCompleteTask}
+                                agentStatus={agentStatus}
+                                onReassign={onReassignTask}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <GanttChart tasks={tasks} />
+                )}
             </div>
         </div>
     );
-});
+};

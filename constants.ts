@@ -78,6 +78,11 @@ export const TASK_STATUS_STYLES: Record<TaskStatus | 'Retrying', { icon: React.F
         color: 'text-purple-300',
         bgColor: 'bg-purple-800/30'
     },
+    [TaskStatus.SCHEDULED]: {
+        icon: CalendarIcon,
+        color: 'text-purple-300',
+        bgColor: 'bg-purple-800/30'
+    },
     [TaskStatus.COMPLETED]: {
         icon: CheckCircleIcon,
         color: 'text-green-300',

@@ -9,6 +9,7 @@ export enum TaskStatus {
     PENDING = "Pending",
     IN_PROGRESS = "In Progress",
     AWAITING_APPROVAL = "Awaiting Approval",
+    SCHEDULED = "Scheduled",
     COMPLETED = "Completed",
     FAILED = "Failed",
 }
@@ -28,6 +29,7 @@ export interface Task {
     progress?: number;
     approvedContent?: string;
     retries?: number;
+    dependsOn?: string[];
 }
 
 export interface Approval {
