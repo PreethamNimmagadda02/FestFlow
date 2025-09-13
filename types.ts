@@ -30,6 +30,7 @@ export interface Task {
     approvedContent?: string;
     retries?: number;
     dependsOn?: string[];
+    customPrompt?: string;
 }
 
 export interface Approval {

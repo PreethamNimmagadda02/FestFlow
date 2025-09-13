@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task, Approval, ActivityLog, AgentName, AgentStatus } from '../types';
+import { Task, Approval, ActivityLog, AgentName, AgentStatus, TaskStatus } from '../types';
 import { AGENT_NAMES, AGENT_DETAILS, AGENT_STATUS_STYLES } from '../constants';
 import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
@@ -10,7 +10,7 @@ import { GanttChartIcon } from './icons/GanttChartIcon';
 // This icon is needed for the Kanban view toggle, but the file doesn't exist.
 // Since new files cannot be added, it's defined here.
 const ColumnsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <rect width="18" height="18" x="3" y="3" rx="2" />
         <path d="M12 3v18" />
     </svg>
@@ -61,6 +61,50 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
     );
 });
 
+const OverallProgress: React.FC<{ tasks: Task[] }> = React.memo(({ tasks }) => {
+    const totalTasks = tasks.length;
+    const completedTasks = tasks.filter(task => task.status === TaskStatus.COMPLETED).length;
+    const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    if (totalTasks === 0) {
+        return (
+            <div className="bg-secondary p-6 rounded-xl border border-accent text-center text-text-secondary">
+                Waiting for tasks to be generated...
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-secondary p-4 md:p-6 rounded-2xl border border-accent/50 shadow-2xl shadow-black/20 transition-all duration-300 hover:shadow-highlight/20 hover:border-highlight/50">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                {/* Left side: Title and Count */}
+                <div className="flex-shrink-0">
+                    <h4 className="font-bold text-lg text-light tracking-wide">Project Completion</h4>
+                    <p className="text-sm font-semibold text-highlight">{completedTasks} of {totalTasks} tasks complete</p>
+                </div>
+                
+                {/* Right side: Progress Bar and Percentage */}
+                <div className="flex items-center gap-4 w-full md:w-3/5">
+                    <div className="w-full bg-primary/70 rounded-full h-6 border border-accent/30 shadow-inner relative">
+                        <div 
+                            className="bg-gradient-to-r from-highlight to-violet-500 h-full rounded-full transition-all duration-1000 ease-in-out relative overflow-hidden"
+                            style={{ width: `${progressPercentage}%` }}
+                            role="progressbar"
+                            aria-valuenow={progressPercentage}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label="Project completion progress"
+                        >
+                           <div className="absolute top-0 -left-full w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer transform -skew-x-12"></div>
+                        </div>
+                    </div>
+                    <span className="font-bold text-light text-xl w-16 text-right tabular-nums">{Math.round(progressPercentage)}%</span>
+                </div>
+            </div>
+        </div>
+    );
+});
+
 
 interface DashboardProps {
     tasks: Task[];
@@ -68,7 +112,7 @@ interface DashboardProps {
     logs: ActivityLog[];
     agentStatus: Record<AgentName, AgentStatus>;
     agentWork: Record<AgentName, string | null>;
-    onApproval: (approvalId: string, decision: 'approved' | 'rejected', newContent?: string) => void;
+    onApproval: (approvalId: string, decision: 'approved' | 'rejected', newContent?: string, customPrompt?: string) => void;
     onCompleteTask: (taskId: string) => void;
     onReassignTask: (taskId: string, newAgent: AgentName) => void;
 }
@@ -91,7 +135,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="space-y-8 animate-fadeIn">
             <div>
                 <h2 className="text-xl font-bold mb-4 text-highlight">2. Monitor Agent Status & Activity</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <div className="lg:col-span-3">
                          <AgentStatusGrid agentStatus={agentStatus} agentWork={agentWork} />
                     </div>
@@ -115,8 +159,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
 
             <div>
-                 <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-highlight">{pendingApprovals.length > 0 ? '4.' : '3.'} Task Progress</h2>
+                 <h2 className="text-xl font-bold text-highlight mb-4">{pendingApprovals.length > 0 ? '4.' : '3.'} Overall Progress</h2>
+                 <OverallProgress tasks={tasks} />
+
+                 <div className="flex justify-between items-center mt-6 mb-4">
+                    <h3 className="text-lg font-bold text-light">Task Board</h3>
                     <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
                         <button 
                             onClick={() => setView('kanban')}

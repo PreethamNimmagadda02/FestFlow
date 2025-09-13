@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { AgentName, Task, TaskStatus } from "../types";
 
@@ -140,7 +141,10 @@ export const executeTask = async (task: Task): Promise<string> => {
         return Promise.reject(new Error(`Task execution failed: The agent ${task.assignedTo} does not generate approvable content.`));
     }
     
-    const prompt = `Based on the following task, please generate the required content.
+    // Use custom prompt if provided, otherwise construct from task details
+    const prompt = task.customPrompt 
+        ? task.customPrompt
+        : `Based on the following task, please generate the required content.
     - Task Title: "${task.title}"
     - Task Description: "${task.description}"
     

@@ -127,7 +127,7 @@ const App: React.FC = () => {
                     status: 'pending'
                 }]);
                 addLog(task.assignedTo, `Task "${task.title}" requires approval.`);
-                setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: TaskStatus.AWAITING_APPROVAL, progress: 100} : t));
+                setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: TaskStatus.AWAITING_APPROVAL, progress: 100, customPrompt: undefined} : t));
 
              } catch(e) {
                 const currentRetries = task.retries || 0;
@@ -244,7 +244,7 @@ const App: React.FC = () => {
         };
     }, []);
 
-    const handleApproval = useCallback((approvalId: string, decision: 'approved' | 'rejected', newContent?: string) => {
+    const handleApproval = useCallback((approvalId: string, decision: 'approved' | 'rejected', newContent?: string, customPrompt?: string) => {
         const approval = approvals.find(a => a.id === approvalId);
         if (!approval) return;
 
@@ -262,12 +262,24 @@ const App: React.FC = () => {
                     ...t, 
                     status: TaskStatus.COMPLETED, 
                     progress: 100,
-                    approvedContent: newContent ?? approval.content
+                    approvedContent: newContent ?? approval.content,
+                    customPrompt: undefined, // Clear custom prompt on approval
                 } : t));
                 addLog(relatedTask.assignedTo, `Task approved: "${relatedTask.title}". Finalizing.`);
             } else {
-                 setTasks(prev => prev.map(t => t.id === approval.taskId ? {...t, status: TaskStatus.IN_PROGRESS, progress: 0, retries: 0} : t));
-                 addLog(relatedTask.assignedTo, `Task rejected: "${relatedTask.title}". Will attempt to regenerate.`);
+                 const logMessage = customPrompt 
+                     ? `Task rejected: "${relatedTask.title}". Will attempt to regenerate with a new prompt.`
+                     : `Task rejected: "${relatedTask.title}". Will attempt to regenerate.`;
+                 
+                 setTasks(prev => prev.map(t => t.id === approval.taskId ? {
+                    ...t, 
+                    status: TaskStatus.IN_PROGRESS, 
+                    progress: 0, 
+                    retries: 0, 
+                    customPrompt: customPrompt, // Set custom prompt for regeneration
+                    approvedContent: undefined // Clear previous content
+                } : t));
+                 addLog(relatedTask.assignedTo, logMessage);
             }
         }
     }, [approvals, tasks, addLog]);
