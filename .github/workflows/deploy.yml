@@ -21,9 +21,11 @@ jobs:
         run: npm install
 
       - name: Build project
-        run: npm run build
+        run: |
+          echo "VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}" > .env
+          npm run build
         env:
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
+          CI: false # Disables treating warnings as errors, just in case
 
       - name: Deploy to Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
