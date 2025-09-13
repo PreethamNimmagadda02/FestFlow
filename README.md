@@ -1,6 +1,7 @@
-## Preetham Nimmagadda 
-## IIT(ISM) Dhanbad
-## Electronics and Communication Engineering
+## My Details
+### Preetham Nimmagadda 
+### IIT(ISM) Dhanbad
+### Electronics and Communication Engineering
 
 ## System Design Documentation of FestFlow
 
