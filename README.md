@@ -1,5 +1,11 @@
 ## System Design Documentation of FestFlow
 
+### Live Application Link
+
+You can view the live application here: **[https://festflow-805bb.web.app/](https://festflow-805bb.web.app/)**
+
+---
+
 ### System Architecture
 
 FestFlow is a **client-server application** that utilizes a **multi-agent system** on the backend. The architecture is designed to be modular and scalable, with a clear separation of concerns between the frontend and the backend services.
@@ -7,6 +13,8 @@ FestFlow is a **client-server application** that utilizes a **multi-agent system
 * **Frontend**: A responsive **single-page application (SPA)** built with **React** and styled with **Tailwind CSS**. It provides an interface for defining event goals, monitoring progress, and approving AI-generated content.
 * **Backend**: A **serverless architecture** powered by the **Google Gemini API**. This backend is responsible for the core AI logic, including goal decomposition and task execution.
 * **AI Orchestration**: The system's intelligence lies in a team of specialized AI agents, each with a distinct role. A **MasterPlannerAgent** breaks down the primary goal into smaller tasks and delegates them to other agents responsible for logistics, sponsorship, and marketing.
+
+---
 
 ### Data Design
 
@@ -16,6 +24,8 @@ The application's data is structured around several key entities that track the 
 * **Approvals**: When an AI agent generates content (e.g., a marketing post), it creates an approval request. This object includes the original content, the agent that produced it, and its current status (pending, approved, or rejected).
 * **Activity Logs**: A time-stamped record of all significant events and actions taken by the AI agents.
 * **Agent Status**: Tracks the current state of each AI agent (idle, working, or error).
+
+---
 
 ### Component Breakdown
 
@@ -27,6 +37,8 @@ The user interface is composed of a series of modular **React components**.
 * **`ApprovalCard.tsx`**: A component for handling content that requires user approval, displaying AI-generated content with buttons to approve or reject it.
 * **`GanttChart.tsx`**: An alternative view for visualizing task dependencies and timelines.
 * **`FestivalSetupForm.tsx`**: The initial form where users input their high-level event goals, which triggers the AI planning process.
+
+---
 
 ### Chosen Technologies
 
