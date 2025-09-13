@@ -64,4 +64,4 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 
  ## Interaction logs
 
-Link: https://g.co/gemini/share/2e14e9709d5d
+Link: https://g.co/gemini/share/2168e6ca076c
