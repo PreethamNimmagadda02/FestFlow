@@ -1,4 +1,4 @@
-Here is the system design document for FestFlow, the AI-powered event orchestration platform.
+System Design Documentation of FestFlow
 
 ### **1. System Architecture**
 
