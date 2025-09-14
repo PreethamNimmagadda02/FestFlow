@@ -30,6 +30,7 @@ The application's data is structured around several key entities that track the 
 * **Activity Logs**: A time-stamped record of all significant events and actions taken by the AI agents.
 * **Agent Status**: Tracks the current state of each AI agent (idle, working, or error).
 * **Data Flow**
+  
   <img width="987" height="246" alt="Screenshot 2025-09-14 at 8 45 32 AM" src="https://github.com/user-attachments/assets/aa9a00a0-0fc6-4f24-a08c-db3beb74c0c9" />
 
 ---
