@@ -59,6 +59,8 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 * **Google Gemini API**: A large language model that serves as the application's intelligent backend, handling goal decomposition and content generation.
 * **Vite**: A frontend build tool that offers a fast development server and optimized build process, enhancing developer productivity and application performance.
 
+---
+
 ### Growth Strategy
 
 ### Phase 2: Enhanced Interactivity and User Experience
@@ -73,7 +75,7 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 ### Phase 3: Real-World Integration and Automation
 
 * **API Integrations:**
-    * **LogisticsCoordinatorAgent:** Connect to Google Calendar API to automatically schedule events and reminders. Integrate with mapping services like Google Maps for venue and travel planning.
+    * **LogisticsCoordinatorAgent:** Connect to Calendar API to automatically schedule events and reminders. Integrate with mapping services like Maps for venue and travel planning.
     * **SponsorshipOutreachAgent:** Integrate with email services like the Gmail API to allow the agent to send outreach emails directly (after user approval).
     * **MarketingAgent:** Connect to social media APIs (e.g., Twitter, Facebook) to schedule and post promotional content.
 * **Vendor and Contact Management:** Add a dedicated section for managing contacts, such as sponsors, vendors, and team members. This could include contact information, communication history, and status.
