@@ -85,6 +85,38 @@ const TaskDetailModal: React.FC<{ task: Task; allTasks: Task[]; onClose: () => v
     );
 });
 
+const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
+    return (
+        <div 
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fadeIn"
+            onClick={onClose}
+        >
+            <div 
+                className="bg-secondary rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
+                onClick={e => e.stopPropagation()}
+                style={{animationDuration: '0.3s'}}
+            >
+                <div className="p-4 border-b border-accent flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-highlight">Result: {task.title}</h3>
+                    <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
+                </div>
+                <div className="p-6 overflow-y-auto">
+                     <pre className="text-text-secondary whitespace-pre-wrap font-sans text-sm bg-primary p-4 rounded-lg border border-accent">{task.approvedContent}</pre>
+                </div>
+                 <div className="p-4 border-t border-accent text-right">
+                    <button 
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+});
+
+
 const getInitialState = <T,>(key: string, defaultValue: T): T => {
     try {
         const storedValue = localStorage.getItem(key);
@@ -115,6 +147,7 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [viewingResultTask, setViewingResultTask] = useState<Task | null>(null);
     const progressIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
     const processingTasks = useRef<Set<string>>(new Set());
 
@@ -145,6 +178,7 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(false);
         setSelectedTask(null);
+        setViewingResultTask(null);
         processingTasks.current.clear();
         Object.values(progressIntervals.current).forEach(clearInterval);
         progressIntervals.current = {};
@@ -407,10 +441,12 @@ const App: React.FC = () => {
                         onCompleteTask={handleCompleteTask}
                         onReassignTask={handleReassignTask}
                         onTaskClick={setSelectedTask}
+                        onViewResult={setViewingResultTask}
                     />
                 )}
             </main>
             {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} />}
+            {viewingResultTask && <ResultModal task={viewingResultTask} onClose={() => setViewingResultTask(null)} />}
         </div>
     );
 };
