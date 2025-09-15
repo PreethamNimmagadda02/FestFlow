@@ -116,6 +116,7 @@ interface DashboardProps {
     onCompleteTask: (taskId: string) => void;
     onReassignTask: (taskId: string, newAgent: AgentName) => void;
     onTaskClick: (task: Task) => void;
+    onViewResult: (task: Task) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -127,7 +128,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onApproval,
     onCompleteTask,
     onReassignTask,
-    onTaskClick
+    onTaskClick,
+    onViewResult
 }) => {
     const [view, setView] = useState<'kanban' | 'gantt'>('kanban');
 
@@ -195,6 +197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 agentStatus={agentStatus}
                                 onReassign={onReassignTask}
                                 onTaskClick={onTaskClick}
+                                onViewResult={onViewResult}
                             />
                         ))}
                     </div>
