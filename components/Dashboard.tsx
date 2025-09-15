@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task, Approval, ActivityLog, AgentName, AgentStatus, TaskStatus } from '../types';
+import { Task, Approval, ActivityLog, AgentName, AgentStatus } from '../types';
 import { AGENT_NAMES, AGENT_DETAILS, AGENT_STATUS_STYLES } from '../constants';
 import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
@@ -63,7 +63,7 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
 
 const OverallProgress: React.FC<{ tasks: Task[] }> = React.memo(({ tasks }) => {
     const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(task => task.status === TaskStatus.COMPLETED).length;
+    const completedTasks = tasks.filter(task => task.status === 'Completed').length;
     const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
     if (totalTasks === 0) {
@@ -115,6 +115,7 @@ interface DashboardProps {
     onApproval: (approvalId: string, decision: 'approved' | 'rejected', newContent?: string, customPrompt?: string) => void;
     onCompleteTask: (taskId: string) => void;
     onReassignTask: (taskId: string, newAgent: AgentName) => void;
+    onTaskClick: (task: Task) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -125,10 +126,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     agentWork,
     onApproval,
     onCompleteTask,
-    onReassignTask
+    onReassignTask,
+    onTaskClick
 }) => {
     const [view, setView] = useState<'kanban' | 'gantt'>('kanban');
-    
+
     const pendingApprovals = approvals.filter(a => a.status === 'pending');
 
     return (
@@ -192,11 +194,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                 onCompleteTask={onCompleteTask}
                                 agentStatus={agentStatus}
                                 onReassign={onReassignTask}
+                                onTaskClick={onTaskClick}
                             />
                         ))}
                     </div>
                 ) : (
-                    <GanttChart tasks={tasks} />
+                    <GanttChart tasks={tasks} onTaskClick={onTaskClick} />
                 )}
             </div>
         </div>
