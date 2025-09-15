@@ -17,6 +17,7 @@ interface TaskLaneProps {
     agentStatus: Record<AgentName, AgentStatus>;
     onReassign: (taskId: string, newAgent: AgentName) => void;
     onTaskClick: (task: Task) => void;
+    onViewResult: (task: Task) => void;
 }
 
 interface TaskCardProps {
@@ -26,41 +27,10 @@ interface TaskCardProps {
     agentStatus: Record<AgentName, AgentStatus>;
     onReassign: (taskId: string, newAgent: AgentName) => void;
     onCardClick: (task: Task) => void;
+    onViewResult: (task: Task) => void;
 }
 
-const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
-    return (
-        <div 
-            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fadeIn"
-            onClick={onClose}
-        >
-            <div 
-                className="bg-secondary rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
-                onClick={e => e.stopPropagation()}
-                style={{animationDuration: '0.3s'}}
-            >
-                <div className="p-4 border-b border-accent flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-highlight">Result: {task.title}</h3>
-                    <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
-                </div>
-                <div className="p-6 overflow-y-auto">
-                     <pre className="text-text-secondary whitespace-pre-wrap font-sans text-sm bg-primary p-4 rounded-lg border border-accent">{task.approvedContent}</pre>
-                </div>
-                 <div className="p-4 border-t border-accent text-right">
-                    <button 
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity"
-                    >
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-});
-
-const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComplete, agentStatus, onReassign, onCardClick }) => {
-    const [isResultVisible, setIsResultVisible] = useState(false);
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComplete, agentStatus, onReassign, onCardClick, onViewResult }) => {
     const [showReassignOptions, setShowReassignOptions] = useState(false);
 
     const isRetrying = task.status === TaskStatus.IN_PROGRESS && (task.retries || 0) > 0;
@@ -92,113 +62,110 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComple
     const agentBgColor = agentColor.replace('text-', 'bg-');
 
     return (
-        <>
-            <div 
-                className={`group relative bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out hover:shadow-lg hover:shadow-highlight/20 hover:scale-[1.03] cursor-pointer`}
-                onClick={() => onCardClick(task)}
-            >
-                {/* Main Content */}
-                <div className={`flex-grow space-y-2 ${isCompleted ? 'opacity-60 group-hover:opacity-100' : ''} transition-opacity`}>
-                    <h4 className={`font-bold text-lg ${isCompleted ? 'text-text-secondary' : 'text-light'}`}>{task.title}</h4>
-                    <p className="text-sm text-text-secondary truncate">{task.description}</p>
+        <div 
+            className={`group relative bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out hover:shadow-lg hover:shadow-highlight/20 hover:scale-[1.03] cursor-pointer`}
+            onClick={() => onCardClick(task)}
+        >
+            {/* Main Content */}
+            <div className={`flex-grow space-y-2 ${isCompleted ? 'opacity-60 group-hover:opacity-100' : ''} transition-opacity`}>
+                <h4 className={`font-bold text-lg ${isCompleted ? 'text-text-secondary' : 'text-light'}`}>{task.title}</h4>
+                <p className="text-sm text-text-secondary truncate">{task.description}</p>
+            </div>
+            
+            {/* Dependencies Section */}
+            {task.dependsOn && task.dependsOn.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-accent/50">
+                    <h5 className="text-xs font-semibold text-text-secondary mb-2">Prerequisites</h5>
+                    <ul className="space-y-1.5">
+                        {task.dependsOn.map(depId => {
+                            const depTask = allTasks.find(t => t.id === depId);
+                            if (!depTask) return null;
+                            const isCompleted = depTask.status === TaskStatus.COMPLETED;
+                            return (
+                                <li key={depId} className={`flex items-center text-xs ${isCompleted ? 'text-gray-500' : 'text-gray-300'}`}>
+                                    {isCompleted ? 
+                                        <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
+                                        <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
+                                    }
+                                    <span className={`${isCompleted ? 'line-through' : ''} truncate`} title={depTask.title}>
+                                        {depTask.title}
+                                    </span>
+                                </li>
+                            );
+                        })}
+                    </ul>
                 </div>
-                
-                {/* Dependencies Section */}
-                {task.dependsOn && task.dependsOn.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-accent/50">
-                        <h5 className="text-xs font-semibold text-text-secondary mb-2">Prerequisites</h5>
-                        <ul className="space-y-1.5">
-                            {task.dependsOn.map(depId => {
-                                const depTask = allTasks.find(t => t.id === depId);
-                                if (!depTask) return null;
-                                const isCompleted = depTask.status === TaskStatus.COMPLETED;
-                                return (
-                                    <li key={depId} className={`flex items-center text-xs ${isCompleted ? 'text-gray-500' : 'text-gray-300'}`}>
-                                        {isCompleted ? 
-                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
-                                            <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
-                                        }
-                                        <span className={`${isCompleted ? 'line-through' : ''} truncate`} title={depTask.title}>
-                                            {depTask.title}
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+            )}
+            
+            {/* Footer with Status and Actions */}
+            <div className="pt-3 space-y-3">
+                 <div className="flex justify-between items-center">
+                    <div className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.bgColor} ${statusStyle.color}`}>
+                        <StatusIcon className="w-3 h-3 mr-1.5" />
+                        {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
                     </div>
-                )}
-                
-                {/* Footer with Status and Actions */}
-                <div className="pt-3 space-y-3">
-                     <div className="flex justify-between items-center">
-                        <div className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.bgColor} ${statusStyle.color}`}>
-                            <StatusIcon className="w-3 h-3 mr-1.5" />
-                            {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
-                        </div>
-                    </div>
+                </div>
 
-                    {isManuallyCompletable && (
-                         <button
-                            onClick={(e) => handleButtonClick(e, () => onComplete(task.id))}
-                            className="w-full bg-success text-white font-bold py-2 px-3 rounded-lg hover:bg-success/90 transition-colors text-sm"
-                        >
-                            Mark as Complete
-                        </button>
-                    )}
-                    {hasApprovedContent && (
+                {isManuallyCompletable && (
+                     <button
+                        onClick={(e) => handleButtonClick(e, () => onComplete(task.id))}
+                        className="w-full bg-success text-white font-bold py-2 px-3 rounded-lg hover:bg-success/90 transition-colors text-sm"
+                    >
+                        Mark as Complete
+                    </button>
+                )}
+                {hasApprovedContent && (
+                    <button
+                        onClick={(e) => handleButtonClick(e, () => onViewResult(task))}
+                        className="w-full bg-info text-white font-bold py-2 px-3 rounded-lg hover:bg-info/90 transition-colors text-sm"
+                    >
+                        View Result
+                    </button>
+                )}
+                {isFailed && (
+                    <div className="relative">
                         <button
-                            onClick={(e) => handleButtonClick(e, () => setIsResultVisible(true))}
-                            className="w-full bg-info text-white font-bold py-2 px-3 rounded-lg hover:bg-info/90 transition-colors text-sm"
+                            onClick={(e) => handleButtonClick(e, () => setShowReassignOptions(!showReassignOptions))}
+                            disabled={availableAgentsForReassignment.length === 0}
+                            className="w-full bg-warning text-white font-bold py-2 px-3 rounded-lg hover:bg-warning/90 transition-colors text-sm disabled:bg-accent disabled:cursor-not-allowed"
                         >
-                            View Result
+                            {availableAgentsForReassignment.length > 0 ? 'Reassign Task' : 'No Agents Available'}
                         </button>
-                    )}
-                    {isFailed && (
-                        <div className="relative">
-                            <button
-                                onClick={(e) => handleButtonClick(e, () => setShowReassignOptions(!showReassignOptions))}
-                                disabled={availableAgentsForReassignment.length === 0}
-                                className="w-full bg-warning text-white font-bold py-2 px-3 rounded-lg hover:bg-warning/90 transition-colors text-sm disabled:bg-accent disabled:cursor-not-allowed"
-                            >
-                                {availableAgentsForReassignment.length > 0 ? 'Reassign Task' : 'No Agents Available'}
-                            </button>
-                            {showReassignOptions && availableAgentsForReassignment.length > 0 && (
-                                <div className="absolute bottom-full mb-2 w-full p-2 bg-accent rounded-md border border-primary space-y-2 z-10 animate-fadeIn" style={{animationDuration: '0.2s'}}>
-                                    <p className="text-xs text-text-secondary px-1">Reassign to:</p>
-                                    {availableAgentsForReassignment.map(agent => (
-                                        <button
-                                            key={agent}
-                                            onClick={(e) => handleButtonClick(e, () => {
-                                                onReassign(task.id, agent);
-                                                setShowReassignOptions(false);
-                                            })}
-                                            className="w-full text-left text-sm p-2 rounded-md hover:bg-highlight/50 transition-colors text-light"
-                                        >
-                                            {agent}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-                 {/* Progress Bar */}
-                 {(task.status === TaskStatus.IN_PROGRESS && progress > 0) && (
-                    <div className="w-full bg-accent rounded-full h-1 mt-3">
-                        <div
-                            className={`${agentBgColor} h-1 rounded-full transition-all duration-500 ease-out`}
-                            style={{ width: `${progress}%` }}
-                        />
+                        {showReassignOptions && availableAgentsForReassignment.length > 0 && (
+                            <div className="absolute bottom-full mb-2 w-full p-2 bg-accent rounded-md border border-primary space-y-2 z-10 animate-fadeIn" style={{animationDuration: '0.2s'}}>
+                                <p className="text-xs text-text-secondary px-1">Reassign to:</p>
+                                {availableAgentsForReassignment.map(agent => (
+                                    <button
+                                        key={agent}
+                                        onClick={(e) => handleButtonClick(e, () => {
+                                            onReassign(task.id, agent);
+                                            setShowReassignOptions(false);
+                                        })}
+                                        className="w-full text-left text-sm p-2 rounded-md hover:bg-highlight/50 transition-colors text-light"
+                                    >
+                                        {agent}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
-            {isResultVisible && hasApprovedContent && <ResultModal task={task} onClose={() => setIsResultVisible(false)} />}
-        </>
+             {/* Progress Bar */}
+             {(task.status === TaskStatus.IN_PROGRESS && progress > 0) && (
+                <div className="w-full bg-accent rounded-full h-1 mt-3">
+                    <div
+                        className={`${agentBgColor} h-1 rounded-full transition-all duration-500 ease-out`}
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+            )}
+        </div>
     );
 });
 
 
-export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks, onCompleteTask, agentStatus, onReassign, onTaskClick }) => {
+export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks, onCompleteTask, agentStatus, onReassign, onTaskClick, onViewResult }) => {
     const agentDetail = AGENT_DETAILS[agentName];
     const Icon = agentDetail.icon;
     
@@ -222,6 +189,7 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
                         agentStatus={agentStatus}
                         onReassign={onReassign}
                         onCardClick={onTaskClick}
+                        onViewResult={onViewResult}
                     />)
                 )}
             </div>
