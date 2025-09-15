@@ -13,6 +13,7 @@ import { XCircleIcon } from './icons/XCircleIcon';
 
 interface GanttChartProps {
     tasks: Task[];
+    onTaskClick: (task: Task) => void;
 }
 
 interface ProcessedTask extends Task {
@@ -31,7 +32,7 @@ const statusIcons: Record<TaskStatus, React.FC<any>> = {
 };
 
 
-export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks }) => {
+export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks, onTaskClick }) => {
     const { processedTasks, totalDuration } = useMemo(() => {
         if (!tasks || tasks.length === 0) {
             return { processedTasks: [], totalDuration: 0 };
@@ -128,13 +129,14 @@ export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks }) => {
                         return (
                             <div 
                                 key={task.id} 
-                                className="absolute flex items-center group"
+                                className="absolute flex items-center group cursor-pointer"
                                 style={{
                                     top: `${task.level * (rowHeight + rowGap) + 10}px`,
                                     left: `${taskListWidth + task.start * 100}px`,
                                     width: `${(task.end - task.start) * 100 - rowGap}px`,
                                     height: `${rowHeight}px`,
                                 }}
+                                onClick={() => onTaskClick(task)}
                             >
                                 <div className={`h-full w-full ${agentColor.replace('text-','bg-')}/30 rounded-lg flex items-center px-3 border-l-4 ${agentColor.replace('text-','border-')}`}>
                                     <StatusIcon className={`w-4 h-4 mr-2 shrink-0 ${agentColor}`} />
