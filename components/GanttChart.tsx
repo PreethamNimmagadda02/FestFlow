@@ -61,7 +61,7 @@ export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks, onTask
                 start = Math.max(...parentEnds);
             }
 
-            const duration = 1; // Assume each task takes 1 time unit
+            const duration = task.estimatedDuration || 1; // Use estimated duration, fallback to 1 day
             const end = start + duration;
 
             memo.set(taskId, { ...task, start, end, level });
@@ -71,7 +71,7 @@ export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks, onTask
         tasks.forEach(task => getTaskEndAndLevel(task.id));
         
         const processedTasks = Array.from(memo.values()).sort((a, b) => a.start - b.start || a.level - b.level);
-        const totalDuration = Math.max(...processedTasks.map(t => t.end), 0);
+        const totalDuration = Math.ceil(Math.max(...processedTasks.map(t => t.end), 0));
         
         // Re-calculate level for vertical positioning to avoid overlaps
         const levels: {end: number}[] = [];
@@ -115,7 +115,7 @@ export const GanttChart: React.FC<GanttChartProps> = React.memo(({ tasks, onTask
                     <div className="flex-grow grid" style={{ gridTemplateColumns: `repeat(${totalDuration}, minmax(0, 1fr))` }}>
                         {Array.from({ length: totalDuration }, (_, i) => (
                             <div key={i} className="text-center text-xs text-text-secondary border-r border-accent pt-4">
-                                Step {i + 1}
+                                Day {i + 1}
                             </div>
                         ))}
                     </div>
