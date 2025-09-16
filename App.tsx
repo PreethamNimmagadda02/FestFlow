@@ -44,6 +44,15 @@ const TaskDetailModal: React.FC<{ task: Task; allTasks: Task[]; onClose: () => v
                             {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
                         </div>
                     </div>
+                    {task.estimatedDuration && (
+                        <div>
+                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Estimated Duration</h4>
+                            <div className="inline-flex items-center text-sm font-semibold px-3 py-1.5 rounded-full bg-accent/50 text-light">
+                                <ClockIcon className="w-4 h-4 mr-2" />
+                                {task.estimatedDuration} day{task.estimatedDuration > 1 ? 's' : ''}
+                            </div>
+                        </div>
+                    )}
                     <div>
                         <h4 className="text-sm font-semibold text-text-secondary mb-2">Description</h4>
                         <p className="text-light whitespace-pre-wrap font-sans text-sm bg-primary p-3 rounded-lg border border-accent">{task.description}</p>
