@@ -182,7 +182,7 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
     const tasksForLane = tasks.filter(t => t.assignedTo === agentName);
 
     return (
-        <div className="bg-secondary p-4 rounded-xl flex flex-col h-full border border-accent">
+        <div className="bg-secondary p-4 rounded-xl flex flex-col border border-accent">
             <div className="flex items-center space-x-3 mb-4 p-2 border-b border-accent">
                 <Icon className={`w-6 h-6 ${agentDetail.color}`} />
                 <h3 className="font-bold text-lg text-light">{agentName}</h3>
