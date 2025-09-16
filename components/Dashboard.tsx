@@ -5,16 +5,6 @@ import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
 import { AgentActivityFeed } from './AgentActivityFeed';
 import { GanttChart } from './GanttChart';
-import { GanttChartIcon } from './icons/GanttChartIcon';
-
-// This icon is needed for the Kanban view toggle, but the file doesn't exist.
-// Since new files cannot be added, it's defined here.
-const ColumnsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <path d="M12 3v18" />
-    </svg>
-);
 
 interface AgentStatusGridProps {
     agentStatus: Record<AgentName, AgentStatus>;
@@ -173,15 +163,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             onClick={() => setView('kanban')}
                             className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
                         >
-                            <ColumnsIcon className="w-4 h-4 inline-block mr-2" />
-                            Kanban
+                            Agent Lanes
                         </button>
                          <button 
                             onClick={() => setView('gantt')}
                             className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
                         >
-                            <GanttChartIcon className="w-4 h-4 inline-block mr-2" />
-                            Gantt
+                            Timeline
                         </button>
                     </div>
                 </div>
