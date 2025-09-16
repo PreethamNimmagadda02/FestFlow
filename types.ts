@@ -31,6 +31,7 @@ export interface Task {
     retries?: number;
     dependsOn?: string[];
     customPrompt?: string;
+    estimatedDuration?: number;
 }
 
 export interface Approval {
