@@ -104,6 +104,12 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComple
                         <StatusIcon className="w-3 h-3 mr-1.5" />
                         {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
                     </div>
+                     {task.estimatedDuration && !isCompleted && (
+                        <div className="text-xs text-text-secondary flex items-center" title={`Estimated Duration: ${task.estimatedDuration} day(s)`}>
+                            <ClockIcon className="w-3.5 h-3.5 mr-1" />
+                            <span>{task.estimatedDuration} day{task.estimatedDuration > 1 ? 's' : ''}</span>
+                        </div>
+                    )}
                 </div>
 
                 {isManuallyCompletable && (
