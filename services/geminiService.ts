@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { AgentName, Task, TaskStatus } from "../types";
 
@@ -64,7 +63,8 @@ Your instructions are:
 3.  Assign each task to the most appropriate agent from the list above.
 4.  Define dependencies between tasks. A task's 'dependsOn' array should contain the 'id's of all tasks that must be completed before it can start. For example, a marketing post about the venue can only be created after the venue is booked.
 5.  Generate a unique, URL-friendly slug for each task 'id'.
-6.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
+6.  Provide a realistic 'estimatedDuration' in days for each task. The duration should be a whole number greater than 0.
+7.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
     
     const taskSchema = {
         type: Type.OBJECT,
@@ -80,9 +80,13 @@ Your instructions are:
                 type: Type.ARRAY,
                 items: { type: Type.STRING },
                 description: "An array of task IDs that must be completed before this task can start. Can be an empty array."
-            }
+            },
+            estimatedDuration: {
+                type: Type.NUMBER,
+                description: "The estimated number of days this task will take to complete (must be a whole number greater than 0)."
+            },
         },
-        required: ["id", "title", "description", "assignedTo", "dependsOn"]
+        required: ["id", "title", "description", "assignedTo", "dependsOn", "estimatedDuration"]
     };
 
     const schema = {
@@ -170,3 +174,4 @@ export const executeTask = async (task: Task): Promise<string> => {
         throw new Error(`An unknown error occurred while executing task "${task.title}".`);
     }
 };
+
