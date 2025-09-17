@@ -1,23 +1,26 @@
+// Fix: Define and export all necessary enums and interfaces for the application.
+// This file should only contain type definitions.
+
 export enum AgentName {
-    MASTER_PLANNER = "MasterPlannerAgent",
-    LOGISTICS_COORDINATOR = "LogisticsCoordinatorAgent",
-    SPONSORSHIP_OUTREACH = "SponsorshipOutreachAgent",
-    MARKETING = "MarketingAgent",
+    MASTER_PLANNER = 'Master Planner',
+    LOGISTICS_COORDINATOR = 'Logistics Coordinator',
+    SPONSORSHIP_OUTREACH = 'Sponsorship Outreach',
+    MARKETING = 'Marketing',
 }
 
 export enum TaskStatus {
-    PENDING = "Pending",
-    IN_PROGRESS = "In Progress",
-    AWAITING_APPROVAL = "Awaiting Approval",
-    SCHEDULED = "Scheduled",
-    COMPLETED = "Completed",
-    FAILED = "Failed",
+    PENDING = 'Pending',
+    IN_PROGRESS = 'In Progress',
+    AWAITING_APPROVAL = 'Awaiting Approval',
+    SCHEDULED = 'Scheduled',
+    COMPLETED = 'Completed',
+    FAILED = 'Failed',
 }
 
 export enum AgentStatus {
-    IDLE = "Idle",
-    WORKING = "Working",
-    ERROR = "Error",
+    IDLE = 'Idle',
+    WORKING = 'Working',
+    ERROR = 'Error',
 }
 
 export interface Task {
@@ -25,13 +28,14 @@ export interface Task {
     title: string;
     description: string;
     assignedTo: AgentName;
-    status: TaskStatus;
-    progress?: number;
-    approvedContent?: string;
-    retries?: number;
     dependsOn?: string[];
-    customPrompt?: string;
     estimatedDuration?: number;
+    status: TaskStatus;
+    progress: number;
+    retries: number;
+    approvedContent?: string;
+    customPrompt?: string;
+    startDate?: string;
 }
 
 export interface Approval {
@@ -44,7 +48,7 @@ export interface Approval {
 }
 
 export interface ActivityLog {
-    timestamp: Date;
     agent: AgentName;
     message: string;
+    timestamp: Date;
 }
