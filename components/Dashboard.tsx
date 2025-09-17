@@ -5,6 +5,7 @@ import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
 import { AgentActivityFeed } from './AgentActivityFeed';
 import { GanttChart } from './GanttChart';
+import { PencilIcon } from './icons/PencilIcon';
 
 interface AgentStatusGridProps {
     agentStatus: Record<AgentName, AgentStatus>;
@@ -107,6 +108,8 @@ interface DashboardProps {
     onReassignTask: (taskId: string, newAgent: AgentName) => void;
     onTaskClick: (task: Task) => void;
     onViewResult: (task: Task) => void;
+    onTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
+    onGanttSaveChanges: (orderedTasks: Task[]) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -119,9 +122,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
     onCompleteTask,
     onReassignTask,
     onTaskClick,
-    onViewResult
+    onViewResult,
+    onTaskUpdate,
+    onGanttSaveChanges
 }) => {
     const [view, setView] = useState<'kanban' | 'gantt'>('kanban');
+    const [isGanttEditing, setIsGanttEditing] = useState(false);
 
     const pendingApprovals = approvals.filter(a => a.status === 'pending');
 
@@ -158,19 +164,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
                  <div className="flex justify-between items-center mt-6 mb-4">
                     <h3 className="text-lg font-bold text-light">Task Board</h3>
-                    <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
-                        <button 
-                            onClick={() => setView('kanban')}
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
-                        >
-                            Agent Lanes
-                        </button>
-                         <button 
-                            onClick={() => setView('gantt')}
-                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
-                        >
-                            Timeline
-                        </button>
+                    <div className="flex items-center space-x-4">
+                         {view === 'gantt' && !isGanttEditing && tasks.length > 0 && (
+                            <button 
+                                onClick={() => setIsGanttEditing(true)}
+                                className="flex items-center space-x-2 rounded-lg border-2 border-accent px-3 py-1 text-sm font-semibold text-text-secondary transition-colors hover:bg-highlight hover:text-white hover:border-highlight"
+                                title="Edit Timeline"
+                            >
+                                <PencilIcon className="w-4 h-4" />
+                                <span>Edit Timeline</span>
+                            </button>
+                        )}
+                        <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
+                            <button 
+                                onClick={() => { setView('kanban'); setIsGanttEditing(false); }}
+                                className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                            >
+                                Agent Lanes
+                            </button>
+                             <button 
+                                onClick={() => setView('gantt')}
+                                className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                            >
+                                Timeline
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -190,7 +208,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         ))}
                     </div>
                 ) : (
-                    <GanttChart tasks={tasks} onTaskClick={onTaskClick} />
+                    <GanttChart 
+                        tasks={tasks} 
+                        onTaskClick={onTaskClick} 
+                        onTaskUpdate={onTaskUpdate}
+                        isEditing={isGanttEditing}
+                        setIsEditing={setIsGanttEditing}
+                        onSaveChanges={onGanttSaveChanges}
+                    />
                 )}
             </div>
         </div>
