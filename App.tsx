@@ -172,6 +172,18 @@ const App: React.FC = () => {
             console.error("Failed to save state to local storage", e);
         }
     }, [tasks, approvals, logs, agentStatus, agentWork, isStarted]);
+
+    // Sync selected task with the main tasks list to reflect updates from Gantt chart
+    useEffect(() => {
+        if (selectedTask) {
+            const updatedSelectedTask = tasks.find(t => t.id === selectedTask.id);
+            if (updatedSelectedTask) {
+                setSelectedTask(updatedSelectedTask);
+            } else {
+                setSelectedTask(null); // Task was removed
+            }
+        }
+    }, [tasks, selectedTask]);
     
     const addLog = useCallback((agent: AgentName, message: string) => {
         setLogs(prev => [...prev, { agent, message, timestamp: new Date() }]);
@@ -308,9 +320,11 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
+        
+        // Tasks that have an absolute start date do not need to wait for dependencies
         const tasksToStart = tasks.filter(task => 
             task.status === TaskStatus.PENDING && 
-            (!task.dependsOn || task.dependsOn.every(depId => completedTaskIds.has(depId)))
+            (task.startDate || (task.dependsOn || []).every(depId => completedTaskIds.has(depId)))
         );
 
         if (tasksToStart.length > 0) {
@@ -433,6 +447,34 @@ const App: React.FC = () => {
         ));
     }, [tasks, addLog]);
 
+    const handleTaskUpdate = useCallback((taskId: string, updates: Partial<Task>) => {
+        setTasks(prevTasks => prevTasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
+        const updatedTask = tasks.find(t => t.id === taskId);
+        if (updatedTask) {
+             addLog(AgentName.MASTER_PLANNER, `Task "${updatedTask.title}" was rescheduled via the timeline.`);
+        }
+    }, [tasks, addLog]);
+    
+    const handleGanttSaveChanges = useCallback((orderedTasks: Task[]) => {
+        addLog(AgentName.MASTER_PLANNER, "Timeline saved. Resetting all tasks and clearing previous results to start the new plan from a clean slate.");
+
+        // The Gantt component has determined the new task order, dependencies, and start dates.
+        // We trust this new structure completely.
+        // We reset all execution state to kick off the new plan from scratch.
+        const newPlanTasks = orderedTasks.map(task => ({
+            ...task,
+            status: TaskStatus.PENDING,
+            progress: 0,
+            retries: 0,
+            approvedContent: undefined, // Clear any previous results
+        }));
+
+        setTasks(newPlanTasks);
+        // Also clear any pending approvals from the old plan, as they are now invalid.
+        setApprovals([]);
+    }, [addLog]);
+
+
     return (
         <div className="min-h-screen bg-primary text-light flex flex-col">
             <Header onReset={handleReset} />
@@ -451,6 +493,8 @@ const App: React.FC = () => {
                         onReassignTask={handleReassignTask}
                         onTaskClick={setSelectedTask}
                         onViewResult={setViewingResultTask}
+                        onTaskUpdate={handleTaskUpdate}
+                        onGanttSaveChanges={handleGanttSaveChanges}
                     />
                 )}
             </main>
