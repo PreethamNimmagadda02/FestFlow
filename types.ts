@@ -23,6 +23,13 @@ export enum AgentStatus {
     ERROR = 'Error',
 }
 
+export interface FileAttachment {
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+}
+
 export interface Task {
     id: string;
     title: string;
@@ -36,6 +43,8 @@ export interface Task {
     approvedContent?: string;
     customPrompt?: string;
     startDate?: string;
+    parentId?: string;
+    attachments?: FileAttachment[];
 }
 
 export interface Approval {
