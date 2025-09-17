@@ -32,13 +32,13 @@ interface GanttChartProps {
 interface GanttTask extends Task {
     ganttStartDate: Date;
     ganttEndDate: Date;
+    level: number;
 }
 
 const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] => {
     const taskMap = new Map<string, Task>(tasks.map(t => [t.id, t]));
     const ganttTaskMap = new Map<string, GanttTask>();
 
-    // Build a map of what tasks depend on each task (children)
     const childrenMap = new Map<string, string[]>();
     tasks.forEach(task => {
         childrenMap.set(task.id, []);
@@ -51,15 +51,12 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
         });
     });
 
-    // Calculate the in-degree (number of unmet dependencies) for each task
     const inDegree = new Map<string, number>();
     tasks.forEach(task => {
         const validDependencies = (task.dependsOn || []).filter(depId => taskMap.has(depId));
         inDegree.set(task.id, validDependencies.length);
     });
 
-    // Initialize a queue with tasks that can be scheduled immediately.
-    // These are tasks with no dependencies OR tasks with a fixed start date.
     const queue: string[] = [];
     tasks.forEach(task => {
         if (task.startDate || inDegree.get(task.id) === 0) {
@@ -71,19 +68,17 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
     while (queue.length > 0) {
         const taskId = queue.shift()!;
         
-        // A task might be processed early due to a fixed start date, so skip if already done.
         if (ganttTaskMap.has(taskId)) continue;
 
         const task = taskMap.get(taskId)!;
         
         let ganttStartDate: Date;
-        // A fixed start date always takes precedence
         if (task.startDate) {
             ganttStartDate = new Date(task.startDate);
         } else if (task.dependsOn && task.dependsOn.length > 0) {
             const parentEndDates = task.dependsOn
                 .map(depId => ganttTaskMap.get(depId)?.ganttEndDate)
-                .filter((d): d is Date => !!d); // Filter out any undefined dates
+                .filter((d): d is Date => !!d);
 
             if (parentEndDates.length > 0) {
                 const maxParentEndDate = new Date(Math.max(...parentEndDates.map(d => d.getTime())));
@@ -98,40 +93,54 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
         const duration = Math.max(1, task.estimatedDuration || 1);
         const ganttEndDate = dateUtils.addDays(ganttStartDate, duration - 1);
 
-        ganttTaskMap.set(taskId, { ...task, ganttStartDate, ganttEndDate });
+        ganttTaskMap.set(taskId, { ...task, ganttStartDate, ganttEndDate, level: 0 });
         processedCount++;
 
-        // For each child of the processed task, decrement their dependency count.
-        // If a child's dependency count reaches zero, it's ready to be processed.
         const children = childrenMap.get(taskId) || [];
         for (const childId of children) {
             const currentInDegree = inDegree.get(childId)!;
             inDegree.set(childId, currentInDegree - 1);
             
-            // If the child has no more unmet dependencies and doesn't have a fixed start date, add it to the queue.
             if (inDegree.get(childId) === 0 && !taskMap.get(childId)?.startDate) {
                 queue.push(childId);
             }
         }
     }
 
-    // Handle circular dependencies: any task not processed is part of a cycle.
-    // Assign them a fallback date to prevent the app from crashing and make the cycle visible.
     if (processedCount < tasks.length) {
         console.warn("Circular dependency detected. Assigning fallback dates to un-processed tasks.");
         tasks.forEach(task => {
             if (!ganttTaskMap.has(task.id)) {
                 console.warn(`- Task in cycle: ${task.title} (${task.id})`);
-                const ganttStartDate = task.startDate ? new Date(task.startDate) : projectStartDate; // Fallback date
+                const ganttStartDate = task.startDate ? new Date(task.startDate) : projectStartDate;
                 const duration = Math.max(1, task.estimatedDuration || 1);
                 const ganttEndDate = dateUtils.addDays(ganttStartDate, duration - 1);
-                ganttTaskMap.set(task.id, { ...task, ganttStartDate, ganttEndDate });
+                ganttTaskMap.set(task.id, { ...task, ganttStartDate, ganttEndDate, level: 0 });
             }
         });
     }
 
-    // Return the calculated tasks in the original order for rendering.
-    return tasks.map(task => ganttTaskMap.get(task.id)!).filter(Boolean);
+    const finalGanttTasks = tasks.map(task => ganttTaskMap.get(task.id)!).filter(Boolean);
+
+    // Calculate indentation level
+    const levelMap = new Map<string, number>();
+    const calculateLevel = (taskId: string): number => {
+        if (levelMap.has(taskId)) return levelMap.get(taskId)!;
+        const task = taskMap.get(taskId);
+        if (!task || !task.parentId || !taskMap.has(task.parentId)) {
+            levelMap.set(taskId, 0);
+            return 0;
+        }
+        const level = calculateLevel(task.parentId) + 1;
+        levelMap.set(taskId, level);
+        return level;
+    };
+
+    finalGanttTasks.forEach(gt => {
+        gt.level = calculateLevel(gt.id);
+    });
+
+    return finalGanttTasks;
 };
 
 
@@ -160,13 +169,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     } | null>(null);
 
     useEffect(() => {
-        // When the parent tasks change, reset local state and history
         setOrderedTasks(tasks);
         setHistory([]);
     }, [tasks]);
 
     const { ganttTasks, chartStartDate, totalDays, projectStartDate } = useMemo(() => {
-        if (tasks.length === 0) { // Base calculation on original tasks to avoid flicker during edits
+        if (tasks.length === 0) {
             const today = new Date();
             today.setHours(0,0,0,0);
             return {
@@ -189,7 +197,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         
         const chartStartDate = projectStartDate;
         const chartEndDate = maxDate;
-        const totalDays = calculatedGanttTasks.length > 0 ? dateUtils.getDaysBetween(chartStartDate, chartEndDate) : 35;
+        let totalDays = calculatedGanttTasks.length > 0 ? dateUtils.getDaysBetween(chartStartDate, chartEndDate) : 35;
+        totalDays = Math.max(totalDays, 35);
         
         return { ganttTasks: calculatedGanttTasks, chartStartDate, totalDays, projectStartDate };
     }, [orderedTasks, tasks]);
@@ -200,12 +209,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
 
     const ganttTasksMap = useMemo(() => new Map(ganttTasks.map(gt => [gt.id, gt])), [ganttTasks]);
     
-    // --- State Update and History Management ---
-
     const updateTasksAndStoreHistory = (updateFn: (currentTasks: Task[]) => Task[]) => {
         setOrderedTasks(currentTasks => {
-            setHistory(prevHistory => [...prevHistory, currentTasks]); // Store the state *before* the update
-            return updateFn(currentTasks); // Return the new state
+            setHistory(prevHistory => [...prevHistory, currentTasks]);
+            return updateFn(currentTasks);
         });
     };
     
@@ -249,7 +256,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         const taskMap = new Map(allTasks.map(t => [t.id, t]));
         const prerequisiteIds = new Set<string>();
         const processingQueue: string[] = [taskId];
-        const visitedForQueue = new Set<string>(); // To avoid adding same task to queue multiple times
+        const visitedForQueue = new Set<string>();
 
         while (processingQueue.length > 0) {
             const currentTaskId = processingQueue.shift()!;
@@ -270,9 +277,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         return prerequisiteIds;
     };
 
-
-    // --- Drag and Drop Handlers ---
-    
     const handleDragStart = (e: React.DragEvent, task: Task) => {
         if (!isEditing) return;
         setDraggingTaskId(task.id);
@@ -297,7 +301,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     };
 
     const handleCancelChanges = () => {
-        setOrderedTasks(tasks); // Revert to original order
+        setOrderedTasks(tasks);
         setIsEditing(false);
         setHistory([]);
     };
@@ -309,7 +313,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     
         while (queue.length > 0) {
             const currentId = queue.shift()!;
-            // Note: We check if any dependency path leads to toId, not just direct dependency.
             const currentTask = taskMap.get(currentId);
             if (currentTask && currentTask.dependsOn) {
                 for (const depId of currentTask.dependsOn) {
@@ -334,9 +337,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             const pathExists = hasPath(targetTask.id, draggedTaskId, currentTasks);
     
             if (pathExists) {
-                // Smart Refactoring: An indirect dependency exists (target -> ... -> dragged).
-                // This action means "make the dragged task parallel to the target task".
-                // We achieve this by making the target task depend on the dragged task's dependencies.
                 const draggedDependencies = currentTasks.find(t => t.id === draggedTaskId)?.dependsOn || [];
                 
                 return currentTasks.map(task => {
@@ -347,19 +347,16 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                 });
     
             } else {
-                // Standard Dependency Creation: Make dragged task dependent on target task.
                 const newTasks = [...currentTasks];
                 const draggedTaskIndex = newTasks.findIndex(t => t.id === draggedTaskId);
     
                 if (draggedTaskIndex === -1) return currentTasks;
     
-                // Make dragged task (A) dependent on target task (B)
                 const draggedTask = { ...newTasks[draggedTaskIndex] };
                 draggedTask.dependsOn = Array.from(new Set([...(draggedTask.dependsOn || []), targetTask.id]));
-                draggedTask.startDate = undefined; // Let date be recalculated
+                draggedTask.startDate = undefined;
                 newTasks[draggedTaskIndex] = draggedTask;
                 
-                // Auto-resolve direct circular dependency: if target (B) previously depended on dragged (A), remove that link.
                 const targetTaskIndex = newTasks.findIndex(t => t.id === targetTask.id);
                 if (targetTaskIndex !== -1) {
                     const newTargetTask = { ...newTasks[targetTaskIndex] };
@@ -385,7 +382,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         
         const adjustedDropX = dropX - dragOffsetX;
         
-        const dayWidth = 64; // 4rem width per day
+        const dayWidth = 64;
         
         const dayIndex = Math.round(adjustedDropX / dayWidth);
         const newStartDate = dateUtils.addDays(chartStartDate, dayIndex);
@@ -455,7 +452,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         }
 
         const allPrereqIds = getAllPrerequisiteIds(hoveredTaskId, orderedTasks);
-        allPrereqIds.add(hoveredTaskId); // The hovered task itself should not be dimmed
+        allPrereqIds.add(hoveredTaskId);
 
         return allPrereqIds;
     }, [isEditing, hoveredTaskId, orderedTasks]);
@@ -463,12 +460,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     const tooltipStyle = useMemo((): React.CSSProperties | null => {
         if (!isEditing || !tooltip) return null;
     
-        const TOOLTIP_ESTIMATED_HEIGHT = 220; // A safe estimation in pixels
+        const TOOLTIP_ESTIMATED_HEIGHT = 220;
         const spaceAbove = tooltip.position.top;
         const spaceBelow = window.innerHeight - tooltip.position.bottom;
         
-        // Position above if there's enough space, OR if there's more space above than below.
-        // This prevents it from flipping down if it barely fits on top.
         const placeAbove = spaceAbove >= TOOLTIP_ESTIMATED_HEIGHT || spaceAbove > spaceBelow;
         
         const style: React.CSSProperties = {
@@ -530,18 +525,19 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             <div className="flex text-sm">
                 <div 
                     ref={sidebarRef}
-                    className="w-64 border-r border-accent font-semibold flex-shrink-0 relative"
+                    className="w-72 border-r border-accent font-semibold flex-shrink-0 relative"
                     onDrop={handleSidebarDrop}
                     onDragOver={handleSidebarDragOver}
                     onDragLeave={() => setDropIndicator(null)}
                 >
                     <div className="h-16 border-b border-accent flex items-center p-4 text-light bg-primary/30 sticky top-0 z-20">Task Name</div>
                     <div className="divide-y divide-accent">
-                        {orderedTasks.map(task => (
+                        {ganttTasks.map(task => (
                             <div 
                                 key={task.id} 
                                 className={`h-12 p-4 flex items-center truncate transition-opacity ${draggingTaskId === task.id ? 'opacity-30' : ''}`}
                                 title={task.title}
+                                style={{ paddingLeft: `${1 + task.level * 1.5}rem` }}
                             >
                                 <span className="truncate text-light">{task.title}</span>
                             </div>
@@ -567,9 +563,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                             </div>
                         </div>
                          <div className="relative divide-y divide-accent">
-                            {orderedTasks.map((task) => {
-                                const ganttTask = ganttTasksMap.get(task.id);
-                                if (!ganttTask) return <div key={task.id} className="h-12"></div>;
+                            {ganttTasks.map((ganttTask) => {
+                                if (!ganttTask) return <div key={ganttTask.id} className="h-12"></div>;
 
                                 const offsetDays = dateUtils.getDaysBetween(chartStartDate, ganttTask.ganttStartDate) -1;
                                 const durationDays = dateUtils.getDaysBetween(ganttTask.ganttStartDate, ganttTask.ganttEndDate);
