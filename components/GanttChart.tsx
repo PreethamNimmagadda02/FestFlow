@@ -153,6 +153,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         };
         position: {
             top: number;
+            bottom: number;
             left: number;
             width: number;
         }
@@ -187,8 +188,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         const maxDate = endDates.length > 0 ? new Date(Math.max(...endDates.map(d => d.getTime()))) : earliestDate;
         
         const chartStartDate = projectStartDate;
-        const chartEndDate = dateUtils.addDays(maxDate, 7);
-        const totalDays = Math.max(35, dateUtils.getDaysBetween(chartStartDate, chartEndDate));
+        const chartEndDate = maxDate;
+        const totalDays = calculatedGanttTasks.length > 0 ? dateUtils.getDaysBetween(chartStartDate, chartEndDate) : 35;
         
         return { ganttTasks: calculatedGanttTasks, chartStartDate, totalDays, projectStartDate };
     }, [orderedTasks, tasks]);
@@ -459,6 +460,32 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         return allPrereqIds;
     }, [isEditing, hoveredTaskId, orderedTasks]);
 
+    const tooltipStyle = useMemo((): React.CSSProperties | null => {
+        if (!isEditing || !tooltip) return null;
+    
+        const TOOLTIP_ESTIMATED_HEIGHT = 220; // A safe estimation in pixels
+        const spaceAbove = tooltip.position.top;
+        const spaceBelow = window.innerHeight - tooltip.position.bottom;
+        
+        // Position above if there's enough space, OR if there's more space above than below.
+        // This prevents it from flipping down if it barely fits on top.
+        const placeAbove = spaceAbove >= TOOLTIP_ESTIMATED_HEIGHT || spaceAbove > spaceBelow;
+        
+        const style: React.CSSProperties = {
+            left: `${tooltip.position.left + tooltip.position.width / 2}px`,
+            transform: 'translateX(-50%)',
+            animationDuration: '0.2s',
+        };
+        
+        if (placeAbove) {
+            style.bottom = `${window.innerHeight - tooltip.position.top + 8}px`;
+        } else {
+            style.top = `${tooltip.position.bottom + 8}px`;
+        }
+    
+        return style;
+    }, [isEditing, tooltip]);
+
 
     if (tasks.length === 0) {
         return (
@@ -500,7 +527,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                     </div>
                 </div>
             )}
-            <div className="flex text-sm" style={{ minWidth: `${256 + totalDays * 64}px`}}>
+            <div className="flex text-sm">
                 <div 
                     ref={sidebarRef}
                     className="w-64 border-r border-accent font-semibold flex-shrink-0 relative"
@@ -526,99 +553,94 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                 </div>
 
                 <div ref={ganttGridRef} className="flex-grow overflow-x-auto" onDrop={handleGridDrop} onDragOver={(e) => e.preventDefault()}>
-                    <div className="sticky top-0 z-10 bg-secondary">
-                        <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, 4rem)` }}>
-                            {timelineDates.map((date, index) => {
-                                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                const relativeDay = dateUtils.getDaysBetween(projectStartDate, date);
-                                return (
-                                <div key={index} className={`h-16 border-b border-r border-accent flex flex-col items-center justify-center ${isWeekend ? 'bg-primary/20' : ''}`}>
-                                    <span className="text-xs text-text-secondary">Day</span>
-                                    <span className="font-bold text-lg text-light">{relativeDay}</span>
-                                </div>
-                            )})}
+                    <div style={{ minWidth: `${totalDays * 64}px` }}>
+                        <div className="sticky top-0 z-10 bg-secondary">
+                            <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, 4rem)` }}>
+                                {timelineDates.map((date, index) => {
+                                    const relativeDay = dateUtils.getDaysBetween(projectStartDate, date);
+                                    return (
+                                    <div key={index} className="h-16 border-b border-r border-accent flex flex-col items-center justify-center">
+                                        <span className="text-xs text-text-secondary">Day</span>
+                                        <span className="font-bold text-lg text-light">{relativeDay}</span>
+                                    </div>
+                                )})}
+                            </div>
                         </div>
-                    </div>
-                     <div className="relative divide-y divide-accent">
-                        {orderedTasks.map((task) => {
-                            const ganttTask = ganttTasksMap.get(task.id);
-                            if (!ganttTask) return <div key={task.id} className="h-12"></div>;
+                         <div className="relative divide-y divide-accent">
+                            {orderedTasks.map((task) => {
+                                const ganttTask = ganttTasksMap.get(task.id);
+                                if (!ganttTask) return <div key={task.id} className="h-12"></div>;
 
-                            const offsetDays = dateUtils.getDaysBetween(chartStartDate, ganttTask.ganttStartDate) -1;
-                            const durationDays = dateUtils.getDaysBetween(ganttTask.ganttStartDate, ganttTask.ganttEndDate);
-                            const startDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttStartDate);
-                            const endDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttEndDate);
-                            
-                            const agentDetail = AGENT_DETAILS[ganttTask.assignedTo];
-                            if (!agentDetail) return null;
+                                const offsetDays = dateUtils.getDaysBetween(chartStartDate, ganttTask.ganttStartDate) -1;
+                                const durationDays = dateUtils.getDaysBetween(ganttTask.ganttStartDate, ganttTask.ganttEndDate);
+                                const startDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttStartDate);
+                                const endDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttEndDate);
+                                
+                                const agentDetail = AGENT_DETAILS[ganttTask.assignedTo];
+                                if (!agentDetail) return null;
 
-                            const agentColor = agentDetail.color;
-                            const agentBgColor = agentColor.replace('text-', 'bg-').replace('-400', '-500/70');
-                            const agentBorderColor = agentColor.replace('text-', 'border-').replace('-400', '-400');
-                            const progress = ganttTask.status === TaskStatus.COMPLETED ? 100 : (ganttTask.progress || 0);
-                            
-                            const isHovered = isEditing && hoveredTaskId === ganttTask.id;
-                            const isRelated = isEditing && relatedTaskIds.has(ganttTask.id);
-                            const isDimmed = isEditing && hoveredTaskId && !isRelated;
+                                const agentColor = agentDetail.color;
+                                const agentBgColor = agentColor.replace('text-', 'bg-').replace('-400', '-500/70');
+                                const agentBorderColor = agentColor.replace('text-', 'border-').replace('-400', '-400');
+                                const progress = ganttTask.status === TaskStatus.COMPLETED ? 100 : (ganttTask.progress || 0);
+                                
+                                const isHovered = isEditing && hoveredTaskId === ganttTask.id;
+                                const isRelated = isEditing && relatedTaskIds.has(ganttTask.id);
+                                const isDimmed = isEditing && hoveredTaskId && !isRelated;
 
-                            return (
-                                <div key={ganttTask.id} className="h-12 relative flex items-center">
-                                    <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${totalDays}, 4rem)` }}>
-                                        {timelineDates.map((date, index) => {
-                                             const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                                             return <div key={index} className={`h-full border-r border-accent ${isWeekend ? 'bg-primary/20' : ''}`}></div>
-                                        })}
+                                return (
+                                    <div key={ganttTask.id} className="h-12 relative flex items-center">
+                                        <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${totalDays}, 4rem)` }}>
+                                            {timelineDates.map((_, index) => {
+                                                 return <div key={index} className="h-full border-r border-accent"></div>
+                                            })}
+                                        </div>
+                                         <div
+                                            draggable={isEditing}
+                                            onDragStart={(e) => handleDragStart(e, ganttTask)}
+                                            onDragEnd={handleDragEnd}
+                                            onDrop={(e) => handleTaskBarDrop(e, ganttTask)}
+                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                            onMouseEnter={(e) => {
+                                                if (isEditing) {
+                                                    const taskElement = e.currentTarget as HTMLDivElement;
+                                                    const rect = taskElement.getBoundingClientRect();
+                                                    setHoveredTaskId(ganttTask.id);
+                                                    const allPrerequisites = getAllPrerequisites(ganttTask.id, orderedTasks);
+                                                    
+                                                    setTooltip({
+                                                        content: { prerequisites: allPrerequisites, startDay, endDay, duration: durationDays },
+                                                        position: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width }
+                                                    });
+                                                }
+                                            }}
+                                            onMouseLeave={() => {
+                                                if (isEditing) {
+                                                    setHoveredTaskId(null);
+                                                    setTooltip(null);
+                                                }
+                                            }}
+                                            onClick={() => !isEditing && onTaskClick(ganttTask)}
+                                            className={`absolute h-8 rounded-md shadow-md flex items-center px-3 text-white overflow-hidden transition-all duration-300 ${agentBgColor} border-l-4 ${agentBorderColor} ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-pointer hover:opacity-80'} ${draggingTaskId === ganttTask.id ? 'opacity-50 scale-105' : ''} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'ring-2 ring-offset-2 ring-offset-secondary ring-highlight' : ''}`}
+                                            style={{
+                                                left: `${Math.max(0, offsetDays) * 4}rem`,
+                                                width: `${durationDays * 4}rem`,
+                                            }}
+                                        >
+                                            <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%`}}></div>
+                                            <span className="relative truncate font-semibold text-xs">{ganttTask.title}</span>
+                                        </div>
                                     </div>
-                                     <div
-                                        draggable={isEditing}
-                                        onDragStart={(e) => handleDragStart(e, ganttTask)}
-                                        onDragEnd={handleDragEnd}
-                                        onDrop={(e) => handleTaskBarDrop(e, ganttTask)}
-                                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                        onMouseEnter={(e) => {
-                                            if (isEditing) {
-                                                const taskElement = e.currentTarget as HTMLDivElement;
-                                                const rect = taskElement.getBoundingClientRect();
-                                                setHoveredTaskId(ganttTask.id);
-                                                const allPrerequisites = getAllPrerequisites(ganttTask.id, orderedTasks);
-                                                
-                                                setTooltip({
-                                                    content: { prerequisites: allPrerequisites, startDay, endDay, duration: durationDays },
-                                                    position: { top: rect.top, left: rect.left, width: rect.width }
-                                                });
-                                            }
-                                        }}
-                                        onMouseLeave={() => {
-                                            if (isEditing) {
-                                                setHoveredTaskId(null);
-                                                setTooltip(null);
-                                            }
-                                        }}
-                                        onClick={() => !isEditing && onTaskClick(ganttTask)}
-                                        className={`absolute h-8 rounded-md shadow-md flex items-center px-3 text-white overflow-hidden transition-all duration-300 ${agentBgColor} border-l-4 ${agentBorderColor} ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-pointer hover:opacity-80'} ${draggingTaskId === ganttTask.id ? 'opacity-50 scale-105' : ''} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'ring-2 ring-offset-2 ring-offset-secondary ring-highlight' : ''}`}
-                                        style={{
-                                            left: `${Math.max(0, offsetDays) * 4}rem`,
-                                            width: `${durationDays * 4}rem`,
-                                        }}
-                                    >
-                                        <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%`}}></div>
-                                        <span className="relative truncate font-semibold text-xs">{ganttTask.title}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
-            {isEditing && tooltip && (
+            {isEditing && tooltip && tooltipStyle && (
                 <div
                     className="fixed z-50 p-4 bg-primary rounded-xl border border-accent shadow-2xl w-64 pointer-events-none transition-opacity duration-200 animate-fadeIn"
-                    style={{ 
-                        bottom: `${window.innerHeight - tooltip.position.top + 8}px`,
-                        left: `${tooltip.position.left + tooltip.position.width / 2}px`,
-                        transform: 'translateX(-50%)',
-                        animationDuration: '0.2s'
-                    }}
+                    style={tooltipStyle}
                 >
                      <div className="space-y-3">
                         <div>
