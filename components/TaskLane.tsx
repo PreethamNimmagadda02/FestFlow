@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Task, AgentName, TaskStatus, AgentStatus } from '../types';
 import { AGENT_DETAILS, TASK_STATUS_STYLES, MAX_TASK_RETRIES, AGENT_NAMES } from '../constants';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { ClockIcon } from './icons/ClockIcon';
+import { ChevronDownIcon } from './icons/ChevronDownIcon';
 
-// Tailwind JIT scanning hints. These classes are constructed dynamically.
+// Tailwind JIT scanning hints
 // border-cyan-400 bg-cyan-400
 // border-orange-400 bg-orange-400
 // border-green-400 bg-green-400
@@ -13,6 +14,7 @@ import { ClockIcon } from './icons/ClockIcon';
 interface TaskLaneProps {
     agentName: AgentName;
     tasks: Task[];
+    allTasks: Task[];
     onCompleteTask: (taskId: string) => void;
     agentStatus: Record<AgentName, AgentStatus>;
     onReassign: (taskId: string, newAgent: AgentName) => void;
@@ -22,29 +24,31 @@ interface TaskLaneProps {
 
 interface TaskCardProps {
     task: Task;
+    subTasks: Task[];
     allTasks: Task[];
     onComplete: (taskId:string) => void;
     agentStatus: Record<AgentName, AgentStatus>;
     onReassign: (taskId: string, newAgent: AgentName) => void;
     onCardClick: (task: Task) => void;
     onViewResult: (task: Task) => void;
+    isSubTask?: boolean;
 }
 
-const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComplete, agentStatus, onReassign, onCardClick, onViewResult }) => {
+const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, subTasks, allTasks, onComplete, agentStatus, onReassign, onCardClick, onViewResult, isSubTask = false }) => {
     const [showReassignOptions, setShowReassignOptions] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(true);
 
     const isRetrying = task.status === TaskStatus.IN_PROGRESS && (task.retries || 0) > 0;
     const statusStyle = isRetrying ? TASK_STATUS_STYLES['Retrying'] : TASK_STATUS_STYLES[task.status];
     const StatusIcon = statusStyle.icon;
     const progress = task.progress ?? 0;
     
-    const isManuallyCompletable = task.assignedTo === AgentName.LOGISTICS_COORDINATOR 
-        && task.status === TaskStatus.IN_PROGRESS 
-        && progress >= 100;
+    const isManuallyCompletable = (task.assignedTo === AgentName.LOGISTICS_COORDINATOR && task.status === TaskStatus.IN_PROGRESS && progress >= 100) || (isSubTask && task.status !== TaskStatus.COMPLETED);
 
     const hasApprovedContent = task.status === TaskStatus.COMPLETED && task.approvedContent;
     const isFailed = task.status === TaskStatus.FAILED;
     const isCompleted = task.status === TaskStatus.COMPLETED;
+    const isParent = subTasks.length > 0;
 
     const availableAgentsForReassignment = AGENT_NAMES.filter(name => 
         name !== AgentName.MASTER_PLANNER &&
@@ -62,124 +66,164 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, allTasks, onComple
     const agentBgColor = agentColor.replace('text-', 'bg-');
 
     return (
-        <div 
-            className="relative group cursor-pointer"
-            onClick={() => onCardClick(task)}
-        >
+        <div className={`w-full ${isSubTask ? 'pl-4' : ''}`}>
             <div 
-                className={`w-full bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out group-hover:shadow-lg group-hover:shadow-highlight/20 group-hover:scale-[1.03]`}
+                className="relative group cursor-pointer"
+                onClick={() => onCardClick(task)}
             >
-                {/* Main Content */}
-                <div className={`flex-grow space-y-2 ${isCompleted ? 'opacity-60 group-hover:opacity-100' : ''} transition-opacity`}>
-                    <h4 className={`font-bold text-lg ${isCompleted ? 'text-text-secondary' : 'text-light'}`}>{task.title}</h4>
-                    <p className="text-sm text-text-secondary truncate">{task.description}</p>
-                </div>
-                
-                {/* Dependencies Section */}
-                {task.dependsOn && task.dependsOn.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-accent/50">
-                        <h5 className="text-xs font-semibold text-text-secondary mb-2">Prerequisites</h5>
-                        <ul className="space-y-1.5">
-                            {task.dependsOn.map(depId => {
-                                const depTask = allTasks.find(t => t.id === depId);
-                                if (!depTask) return null;
-                                const isCompleted = depTask.status === TaskStatus.COMPLETED;
-                                return (
-                                    <li key={depId} className={`flex items-center text-xs ${isCompleted ? 'text-gray-500' : 'text-gray-300'}`}>
-                                        {isCompleted ? 
-                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
-                                            <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
-                                        }
-                                        <span className={`${isCompleted ? 'line-through' : ''} truncate`} title={depTask.title}>
-                                            {depTask.title}
-                                        </span>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
-                )}
-                
-                {/* Footer with Status and Actions */}
-                <div className="pt-3 space-y-3">
-                     <div className="flex justify-between items-center">
-                        <div className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.bgColor} ${statusStyle.color}`}>
-                            <StatusIcon className="w-3 h-3 mr-1.5" />
-                            {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
+                <div 
+                    className={`w-full bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out group-hover:shadow-lg group-hover:shadow-highlight/20 group-hover:scale-[1.03]`}
+                >
+                    <div className={`flex-grow space-y-2 ${isCompleted ? 'opacity-60 group-hover:opacity-100' : ''} transition-opacity`}>
+                        <div className="flex justify-between items-center">
+                            <h4 className={`font-bold text-lg ${isCompleted ? 'text-text-secondary' : 'text-light'} ${isSubTask ? 'text-base' : ''}`}>{task.title}</h4>
+                             {isParent && (
+                                <button onClick={(e) => handleButtonClick(e, () => setIsExpanded(!isExpanded))} className="p-1 rounded-full hover:bg-accent">
+                                    <ChevronDownIcon className={`w-5 h-5 text-text-secondary transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                            )}
                         </div>
-                         {task.estimatedDuration && !isCompleted && (
-                            <div className="text-xs text-text-secondary flex items-center" title={`Estimated Duration: ${task.estimatedDuration} day(s)`}>
-                                <ClockIcon className="w-3.5 h-3.5 mr-1" />
-                                <span>{task.estimatedDuration} day{task.estimatedDuration > 1 ? 's' : ''}</span>
-                            </div>
-                        )}
+                        <p className="text-sm text-text-secondary truncate">{task.description}</p>
                     </div>
-
-                    {isManuallyCompletable && (
-                         <button
-                            onClick={(e) => handleButtonClick(e, () => onComplete(task.id))}
-                            className="w-full bg-success text-white font-bold py-2 px-3 rounded-lg hover:bg-success/90 transition-colors text-sm"
-                        >
-                            Mark as Complete
-                        </button>
+                    
+                    {task.dependsOn && task.dependsOn.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-accent/50">
+                            <h5 className="text-xs font-semibold text-text-secondary mb-2">Prerequisites</h5>
+                            <ul className="space-y-1.5">
+                                {task.dependsOn.map(depId => {
+                                    const depTask = allTasks.find(t => t.id === depId);
+                                    if (!depTask) return null;
+                                    const isCompleted = depTask.status === TaskStatus.COMPLETED;
+                                    return (
+                                        <li key={depId} className={`flex items-center text-xs ${isCompleted ? 'text-gray-500' : 'text-gray-300'}`}>
+                                            {isCompleted ? 
+                                                <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
+                                                <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
+                                            }
+                                            <span className={`${isCompleted ? 'line-through' : ''} truncate`} title={depTask.title}>
+                                                {depTask.title}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
                     )}
-                    {hasApprovedContent && (
-                        <button
-                            onClick={(e) => handleButtonClick(e, () => onViewResult(task))}
-                            className="w-full bg-info text-white font-bold py-2 px-3 rounded-lg hover:bg-info/90 transition-colors text-sm"
-                        >
-                            View Result
-                        </button>
-                    )}
-                    {isFailed && (
-                        <div className="relative">
-                            <button
-                                onClick={(e) => handleButtonClick(e, () => setShowReassignOptions(!showReassignOptions))}
-                                disabled={availableAgentsForReassignment.length === 0}
-                                className="w-full bg-warning text-white font-bold py-2 px-3 rounded-lg hover:bg-warning/90 transition-colors text-sm disabled:bg-accent disabled:cursor-not-allowed"
-                            >
-                                {availableAgentsForReassignment.length > 0 ? 'Reassign Task' : 'No Agents Available'}
-                            </button>
-                            {showReassignOptions && availableAgentsForReassignment.length > 0 && (
-                                <div className="absolute bottom-full mb-2 w-full p-2 bg-accent rounded-md border border-primary space-y-2 z-10 animate-fadeIn" style={{animationDuration: '0.2s'}}>
-                                    <p className="text-xs text-text-secondary px-1">Reassign to:</p>
-                                    {availableAgentsForReassignment.map(agent => (
-                                        <button
-                                            key={agent}
-                                            onClick={(e) => handleButtonClick(e, () => {
-                                                onReassign(task.id, agent);
-                                                setShowReassignOptions(false);
-                                            })}
-                                            className="w-full text-left text-sm p-2 rounded-md hover:bg-highlight/50 transition-colors text-light"
-                                        >
-                                            {agent}
-                                        </button>
-                                    ))}
+                    
+                    <div className="pt-3 space-y-3">
+                         <div className="flex justify-between items-center">
+                            <div className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${statusStyle.bgColor} ${statusStyle.color}`}>
+                                <StatusIcon className="w-3 h-3 mr-1.5" />
+                                {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
+                            </div>
+                             {task.estimatedDuration && !isCompleted && (
+                                <div className="text-xs text-text-secondary flex items-center" title={`Estimated Duration: ${task.estimatedDuration} day(s)`}>
+                                    <ClockIcon className="w-3.5 h-3.5 mr-1" />
+                                    <span>{task.estimatedDuration} day{task.estimatedDuration > 1 ? 's' : ''}</span>
                                 </div>
                             )}
                         </div>
+
+                        {isManuallyCompletable && (
+                             <button
+                                onClick={(e) => handleButtonClick(e, () => onComplete(task.id))}
+                                className="w-full bg-success text-white font-bold py-2 px-3 rounded-lg hover:bg-success/90 transition-colors text-sm"
+                            >
+                                Mark as Complete
+                            </button>
+                        )}
+                        {hasApprovedContent && (
+                            <button
+                                onClick={(e) => handleButtonClick(e, () => onViewResult(task))}
+                                className="w-full bg-info text-white font-bold py-2 px-3 rounded-lg hover:bg-info/90 transition-colors text-sm"
+                            >
+                                View Result
+                            </button>
+                        )}
+                        {isFailed && (
+                            <div className="relative">
+                                <button
+                                    onClick={(e) => handleButtonClick(e, () => setShowReassignOptions(!showReassignOptions))}
+                                    disabled={availableAgentsForReassignment.length === 0}
+                                    className="w-full bg-warning text-white font-bold py-2 px-3 rounded-lg hover:bg-warning/90 transition-colors text-sm disabled:bg-accent disabled:cursor-not-allowed"
+                                >
+                                    {availableAgentsForReassignment.length > 0 ? 'Reassign Task' : 'No Agents Available'}
+                                </button>
+                                {showReassignOptions && availableAgentsForReassignment.length > 0 && (
+                                    <div className="absolute bottom-full mb-2 w-full p-2 bg-accent rounded-md border border-primary space-y-2 z-10 animate-fadeIn" style={{animationDuration: '0.2s'}}>
+                                        <p className="text-xs text-text-secondary px-1">Reassign to:</p>
+                                        {availableAgentsForReassignment.map(agent => (
+                                            <button
+                                                key={agent}
+                                                onClick={(e) => handleButtonClick(e, () => {
+                                                    onReassign(task.id, agent);
+                                                    setShowReassignOptions(false);
+                                                })}
+                                                className="w-full text-left text-sm p-2 rounded-md hover:bg-highlight/50 transition-colors text-light"
+                                            >
+                                                {agent}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                     {((task.status === TaskStatus.IN_PROGRESS && progress > 0) || (isParent && progress > 0)) && (
+                        <div className="w-full bg-accent rounded-full h-1 mt-3">
+                            <div
+                                className={`${agentBgColor} h-1 rounded-full transition-all duration-500 ease-out`}
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
                     )}
                 </div>
-                 {/* Progress Bar */}
-                 {(task.status === TaskStatus.IN_PROGRESS && progress > 0) && (
-                    <div className="w-full bg-accent rounded-full h-1 mt-3">
-                        <div
-                            className={`${agentBgColor} h-1 rounded-full transition-all duration-500 ease-out`}
-                            style={{ width: `${progress}%` }}
-                        />
-                    </div>
-                )}
             </div>
+             {isParent && isExpanded && (
+                <div className="mt-2 space-y-2 border-l-2 border-accent/50 ml-2">
+                    {subTasks.map(subTask => (
+                        <TaskCard
+                            key={subTask.id}
+                            task={subTask}
+                            subTasks={[]} // Sub-tasks don't have further nesting in this UI
+                            allTasks={allTasks}
+                            onComplete={onComplete}
+                            agentStatus={agentStatus}
+                            onReassign={onReassign}
+                            onCardClick={onCardClick}
+                            onViewResult={onViewResult}
+                            isSubTask={true}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 });
 
 
-export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks, onCompleteTask, agentStatus, onReassign, onTaskClick, onViewResult }) => {
+export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks, allTasks, onCompleteTask, agentStatus, onReassign, onTaskClick, onViewResult }) => {
     const agentDetail = AGENT_DETAILS[agentName];
     const Icon = agentDetail.icon;
     
-    const tasksForLane = tasks.filter(t => t.assignedTo === agentName);
+    const { topLevelTasks, subTaskMap } = useMemo(() => {
+        const tasksForLane = tasks.filter(t => t.assignedTo === agentName);
+        const taskIdsInLane = new Set(tasksForLane.map(t => t.id));
+
+        const topLevelTasks = tasksForLane.filter(t => !t.parentId || !taskIdsInLane.has(t.parentId));
+        
+        const subTaskMap = new Map<string, Task[]>();
+        tasksForLane.forEach(task => {
+            if (task.parentId) {
+                if (!subTaskMap.has(task.parentId)) {
+                    subTaskMap.set(task.parentId, []);
+                }
+                subTaskMap.get(task.parentId)!.push(task);
+            }
+        });
+
+        return { topLevelTasks, subTaskMap };
+    }, [tasks, agentName]);
 
     return (
         <div className="bg-secondary p-4 rounded-xl flex flex-col border border-accent">
@@ -189,13 +233,14 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
             </div>
             <div className="flex-grow overflow-y-auto overflow-x-hidden">
                  <div className="space-y-4 p-2">
-                     {tasksForLane.length === 0 ? (
-                        <p className="text-text-secondary text-sm p-4 text-center">No tasks assigned.</p>
+                     {topLevelTasks.length === 0 ? (
+                        <p className="text-text-secondary text-sm p-4 text-center">No tasks assigned or matching filters.</p>
                     ) : (
-                        tasksForLane.map(task => <TaskCard 
+                        topLevelTasks.map(task => <TaskCard 
                             key={task.id} 
                             task={task} 
-                            allTasks={tasks}
+                            subTasks={subTaskMap.get(task.id) || []}
+                            allTasks={allTasks}
                             onComplete={onCompleteTask}
                             agentStatus={agentStatus}
                             onReassign={onReassign}
