@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { Task, Approval, ActivityLog, AgentName, AgentStatus } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Task, Approval, ActivityLog, AgentName, AgentStatus, TaskStatus } from '../types';
 import { AGENT_NAMES, AGENT_DETAILS, AGENT_STATUS_STYLES } from '../constants';
 import { TaskLane } from './TaskLane';
 import { ApprovalCard } from './ApprovalCard';
 import { AgentActivityFeed } from './AgentActivityFeed';
 import { GanttChart } from './GanttChart';
 import { PencilIcon } from './icons/PencilIcon';
+import { SearchIcon } from './icons/SearchIcon';
+import { FilterIcon } from './icons/FilterIcon';
+import { XCircleIcon } from './icons/XCircleIcon';
 
 interface AgentStatusGridProps {
     agentStatus: Record<AgentName, AgentStatus>;
@@ -68,13 +71,11 @@ const OverallProgress: React.FC<{ tasks: Task[] }> = React.memo(({ tasks }) => {
     return (
         <div className="bg-secondary p-4 md:p-6 rounded-2xl border border-accent/50 shadow-2xl shadow-black/20 transition-all duration-300 hover:shadow-highlight/20 hover:border-highlight/50">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                {/* Left side: Title and Count */}
                 <div className="flex-shrink-0">
                     <h4 className="font-bold text-lg text-light tracking-wide">Project Completion</h4>
                     <p className="text-sm font-semibold text-highlight">{completedTasks} of {totalTasks} tasks complete</p>
                 </div>
                 
-                {/* Right side: Progress Bar and Percentage */}
                 <div className="flex items-center gap-4 w-full md:w-3/5">
                     <div className="w-full bg-primary/70 rounded-full h-6 border border-accent/30 shadow-inner relative">
                         <div 
@@ -128,8 +129,68 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
     const [view, setView] = useState<'kanban' | 'gantt'>('kanban');
     const [isGanttEditing, setIsGanttEditing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterAgent, setFilterAgent] = useState<AgentName | 'all'>('all');
+    const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
 
     const pendingApprovals = approvals.filter(a => a.status === 'pending');
+
+    const filteredTasks = useMemo(() => {
+        const lowercasedSearch = searchTerm.toLowerCase();
+        
+        const taskMap = new Map(tasks.map(t => [t.id, t]));
+
+        const getParentChain = (taskId: string, chain: Set<string> = new Set()): Set<string> => {
+            const task = taskMap.get(taskId);
+            if (task?.parentId && !chain.has(task.parentId)) {
+                chain.add(task.parentId);
+                getParentChain(task.parentId, chain);
+            }
+            return chain;
+        };
+
+        const getSubTaskChain = (taskId: string, chain: Set<string> = new Set()): Set<string> => {
+            const children = tasks.filter(t => t.parentId === taskId);
+            children.forEach(child => {
+                if (!chain.has(child.id)) {
+                    chain.add(child.id);
+                    getSubTaskChain(child.id, chain);
+                }
+            });
+            return chain;
+        };
+        
+        if (!searchTerm && filterAgent === 'all' && filterStatus === 'all') {
+            return tasks;
+        }
+
+        const matchingTaskIds = new Set<string>();
+
+        tasks.forEach(task => {
+            const matchesAgent = filterAgent === 'all' || task.assignedTo === filterAgent;
+            const matchesStatus = filterStatus === 'all' || task.status === filterStatus;
+            const matchesSearch = lowercasedSearch === '' || 
+                                  task.title.toLowerCase().includes(lowercasedSearch) || 
+                                  task.description.toLowerCase().includes(lowercasedSearch);
+
+            if (matchesAgent && matchesStatus && matchesSearch) {
+                matchingTaskIds.add(task.id);
+                // Add parents and children to maintain context
+                getParentChain(task.id).forEach(id => matchingTaskIds.add(id));
+                getSubTaskChain(task.id).forEach(id => matchingTaskIds.add(id));
+            }
+        });
+        
+        return tasks.filter(task => matchingTaskIds.has(task.id));
+    }, [tasks, searchTerm, filterAgent, filterStatus]);
+    
+    const showClearFilters = searchTerm || filterAgent !== 'all' || filterStatus !== 'all';
+
+    const clearFilters = () => {
+        setSearchTerm('');
+        setFilterAgent('all');
+        setFilterStatus('all');
+    };
 
     return (
         <div className="space-y-8 animate-fadeIn">
@@ -162,61 +223,112 @@ export const Dashboard: React.FC<DashboardProps> = ({
                  <h2 className="text-xl font-bold text-highlight mb-4">{pendingApprovals.length > 0 ? '4.' : '3.'} Overall Progress</h2>
                  <OverallProgress tasks={tasks} />
 
-                 <div className="flex justify-between items-center mt-6 mb-4">
+                 <div className="flex justify-between items-center mt-6">
                     <h3 className="text-lg font-bold text-light">Task Board</h3>
-                    <div className="flex items-center space-x-4">
-                         {view === 'gantt' && !isGanttEditing && tasks.length > 0 && (
-                            <button 
-                                onClick={() => setIsGanttEditing(true)}
-                                className="flex items-center space-x-2 rounded-lg border-2 border-accent px-3 py-1 text-sm font-semibold text-text-secondary transition-colors hover:bg-highlight hover:text-white hover:border-highlight"
-                                title="Edit Timeline"
-                            >
-                                <PencilIcon className="w-4 h-4" />
-                                <span>Edit Timeline</span>
-                            </button>
-                        )}
-                        <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
-                            <button 
-                                onClick={() => { setView('kanban'); setIsGanttEditing(false); }}
-                                className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
-                            >
-                                Agent Lanes
-                            </button>
-                             <button 
-                                onClick={() => setView('gantt')}
-                                className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
-                            >
-                                Timeline
-                            </button>
-                        </div>
+                    <div className="flex items-center space-x-2 bg-secondary p-1 rounded-lg border border-accent">
+                        <button 
+                            onClick={() => { setView('kanban'); setIsGanttEditing(false); }}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'kanban' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                        >
+                            Agent Lanes
+                        </button>
+                         <button 
+                            onClick={() => setView('gantt')}
+                            className={`px-3 py-1 text-sm rounded-md transition-colors ${view === 'gantt' ? 'bg-highlight text-white' : 'text-text-secondary hover:bg-accent'}`}
+                        >
+                            Timeline
+                        </button>
                     </div>
                 </div>
 
-                {view === 'kanban' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                        {AGENT_NAMES.filter(name => name !== AgentName.MASTER_PLANNER).map(agentName => (
-                            <TaskLane
-                                key={agentName}
-                                agentName={agentName}
-                                tasks={tasks}
-                                onCompleteTask={onCompleteTask}
-                                agentStatus={agentStatus}
-                                onReassign={onReassignTask}
-                                onTaskClick={onTaskClick}
-                                onViewResult={onViewResult}
-                            />
-                        ))}
+                <div className="bg-secondary p-3 mt-4 rounded-xl border border-accent flex flex-col md:flex-row items-center gap-4">
+                    <div className="relative w-full md:flex-grow">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-text-secondary" />
+                        <input
+                            type="text"
+                            placeholder="Search tasks by title or description..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light pl-10 pr-4 py-2"
+                        />
                     </div>
-                ) : (
-                    <GanttChart 
-                        tasks={tasks} 
-                        onTaskClick={onTaskClick} 
-                        onTaskUpdate={onTaskUpdate}
-                        isEditing={isGanttEditing}
-                        setIsEditing={setIsGanttEditing}
-                        onSaveChanges={onGanttSaveChanges}
-                    />
-                )}
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        <div className="relative w-full md:w-52">
+                             <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                             <select
+                                value={filterAgent}
+                                onChange={(e) => setFilterAgent(e.target.value as AgentName | 'all')}
+                                className="w-full appearance-none bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light pl-9 pr-8 py-2 text-sm"
+                            >
+                                <option value="all">All Agents</option>
+                                {AGENT_NAMES.filter(a => a !== AgentName.MASTER_PLANNER).map(agent => (
+                                    <option key={agent} value={agent}>{agent}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="relative w-full md:w-52">
+                            <FilterIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value as TaskStatus | 'all')}
+                                className="w-full appearance-none bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light pl-9 pr-8 py-2 text-sm"
+                            >
+                                <option value="all">All Statuses</option>
+                                {Object.values(TaskStatus).map(status => (
+                                    <option key={status} value={status}>{status}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {showClearFilters && (
+                           <button onClick={clearFilters} className="p-2 text-text-secondary hover:text-white" title="Clear filters">
+                               <XCircleIcon className="w-5 h-5"/>
+                           </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    {view === 'kanban' ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                            {AGENT_NAMES.filter(name => name !== AgentName.MASTER_PLANNER).map(agentName => (
+                                <TaskLane
+                                    key={agentName}
+                                    agentName={agentName}
+                                    tasks={filteredTasks}
+                                    allTasks={tasks}
+                                    onCompleteTask={onCompleteTask}
+                                    agentStatus={agentStatus}
+                                    onReassign={onReassignTask}
+                                    onTaskClick={onTaskClick}
+                                    onViewResult={onViewResult}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div>
+                            <div className="flex justify-end mb-4">
+                                {view === 'gantt' && !isGanttEditing && tasks.length > 0 && (
+                                    <button 
+                                        onClick={() => setIsGanttEditing(true)}
+                                        className="flex items-center space-x-2 rounded-lg border-2 border-accent px-3 py-1 text-sm font-semibold text-text-secondary transition-colors hover:bg-highlight hover:text-white hover:border-highlight"
+                                        title="Edit Timeline"
+                                    >
+                                        <PencilIcon className="w-4 h-4" />
+                                        <span>Edit Timeline</span>
+                                    </button>
+                                )}
+                            </div>
+                            <GanttChart 
+                                tasks={filteredTasks} 
+                                onTaskClick={onTaskClick} 
+                                onTaskUpdate={onTaskUpdate}
+                                isEditing={isGanttEditing}
+                                setIsEditing={setIsGanttEditing}
+                                onSaveChanges={onGanttSaveChanges}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
