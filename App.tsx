@@ -2,97 +2,10 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { EventSetupForm } from './components/FestivalSetupForm';
 import { Dashboard } from './components/Dashboard';
+import { TaskDetailModal } from './components/TaskDetailModal';
 import { AgentName, Task, Approval, ActivityLog, AgentStatus, TaskStatus } from './types';
-import { AGENT_NAMES, MAX_TASK_RETRIES, AGENT_DETAILS, TASK_STATUS_STYLES } from './constants';
+import { AGENT_NAMES, MAX_TASK_RETRIES } from './constants';
 import { decomposeGoal, executeTask } from './services/geminiService';
-import { CheckCircleIcon } from './components/icons/CheckCircleIcon';
-import { ClockIcon } from './components/icons/ClockIcon';
-
-const TaskDetailModal: React.FC<{ task: Task; allTasks: Task[]; onClose: () => void }> = React.memo(({ task, allTasks, onClose }) => {
-    const agentDetail = AGENT_DETAILS[task.assignedTo];
-    const isRetrying = task.status === TaskStatus.IN_PROGRESS && (task.retries || 0) > 0;
-    const statusStyle = isRetrying ? TASK_STATUS_STYLES['Retrying'] : TASK_STATUS_STYLES[task.status];
-    const StatusIcon = statusStyle.icon;
-    const AgentIcon = agentDetail.icon;
-
-    return (
-        <div 
-            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fadeIn"
-            onClick={onClose}
-        >
-            <div 
-                className="bg-secondary rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
-                onClick={e => e.stopPropagation()}
-                style={{animationDuration: '0.3s'}}
-            >
-                <div className="p-4 border-b border-accent flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-highlight">{task.title}</h3>
-                    <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
-                </div>
-                <div className="p-6 overflow-y-auto space-y-4">
-                    <div>
-                        <h4 className="text-sm font-semibold text-text-secondary mb-2">Assigned To</h4>
-                        <div className="flex items-center space-x-2 bg-primary p-2 rounded-lg">
-                             <AgentIcon className={`w-5 h-5 ${agentDetail.color}`} />
-                             <span className="font-bold text-light">{task.assignedTo}</span>
-                        </div>
-                    </div>
-                     <div>
-                        <h4 className="text-sm font-semibold text-text-secondary mb-2">Status</h4>
-                        <div className={`inline-flex items-center text-sm font-semibold px-3 py-1.5 rounded-full ${statusStyle.bgColor} ${statusStyle.color}`}>
-                            <StatusIcon className="w-4 h-4 mr-2" />
-                            {isRetrying ? `Retrying (${task.retries}/${MAX_TASK_RETRIES})` : task.status}
-                        </div>
-                    </div>
-                    {task.estimatedDuration && (
-                        <div>
-                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Estimated Duration</h4>
-                            <div className="inline-flex items-center text-sm font-semibold px-3 py-1.5 rounded-full bg-accent/50 text-light">
-                                <ClockIcon className="w-4 h-4 mr-2" />
-                                {task.estimatedDuration} day{task.estimatedDuration > 1 ? 's' : ''}
-                            </div>
-                        </div>
-                    )}
-                    <div>
-                        <h4 className="text-sm font-semibold text-text-secondary mb-2">Description</h4>
-                        <p className="text-light whitespace-pre-wrap font-sans text-sm bg-primary p-3 rounded-lg border border-accent">{task.description}</p>
-                    </div>
-
-                    {task.dependsOn && task.dependsOn.length > 0 && (
-                        <div>
-                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Dependencies</h4>
-                            <ul className="space-y-2 bg-primary p-3 rounded-lg border border-accent">
-                                {task.dependsOn.map(depId => {
-                                    const depTask = allTasks.find(t => t.id === depId);
-                                    const isCompleted = depTask?.status === TaskStatus.COMPLETED;
-                                    return (
-                                        <li key={depId} className={`flex items-center text-sm ${isCompleted ? 'text-light' : 'text-text-secondary'}`}>
-                                            {isCompleted ? 
-                                                <CheckCircleIcon className="w-4 h-4 mr-2 text-success flex-shrink-0" /> : 
-                                                <ClockIcon className="w-4 h-4 mr-2 text-yellow-300 flex-shrink-0" />
-                                            }
-                                            <span className={isCompleted ? 'line-through' : ''}>
-                                                {depTask ? depTask.title : 'Unknown Task'}
-                                            </span>
-                                        </li>
-                                    )
-                                })}
-                            </ul>
-                        </div>
-                    )}
-                </div>
-                 <div className="p-4 border-t border-accent text-right">
-                    <button 
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity"
-                    >
-                        Close
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-});
 
 const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
     return (
@@ -173,7 +86,7 @@ const App: React.FC = () => {
         }
     }, [tasks, approvals, logs, agentStatus, agentWork, isStarted]);
 
-    // Sync selected task with the main tasks list to reflect updates from Gantt chart
+    // Sync selected task with the main tasks list to reflect updates
     useEffect(() => {
         if (selectedTask) {
             const updatedSelectedTask = tasks.find(t => t.id === selectedTask.id);
@@ -185,6 +98,47 @@ const App: React.FC = () => {
         }
     }, [tasks, selectedTask]);
     
+    // Automatically calculate progress for parent tasks
+    useEffect(() => {
+        const taskMap = new Map(tasks.map(t => [t.id, t]));
+        const parentProgressUpdates = new Map<string, { completed: number; total: number }>();
+
+        tasks.forEach(task => {
+            if (task.parentId && taskMap.has(task.parentId)) {
+                if (!parentProgressUpdates.has(task.parentId)) {
+                    parentProgressUpdates.set(task.parentId, { completed: 0, total: 0 });
+                }
+                const stats = parentProgressUpdates.get(task.parentId)!;
+                stats.total += 1;
+                if (task.status === TaskStatus.COMPLETED) {
+                    stats.completed += 1;
+                }
+            }
+        });
+
+        if (parentProgressUpdates.size > 0) {
+            setTasks(currentTasks => {
+                let hasChanged = false;
+                const newTasks = currentTasks.map(task => {
+                    if (parentProgressUpdates.has(task.id)) {
+                        const parent = taskMap.get(task.id)!;
+                        const stats = parentProgressUpdates.get(task.id)!;
+                        const newProgress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
+                        if (parent.progress !== newProgress) {
+                            hasChanged = true;
+                            // Don't auto-complete parent, just update progress
+                            return { ...parent, progress: newProgress };
+                        }
+                    }
+                    return task;
+                });
+                return hasChanged ? newTasks : currentTasks;
+            });
+        }
+    }, [tasks]);
+
+
     const addLog = useCallback((agent: AgentName, message: string) => {
         setLogs(prev => [...prev, { agent, message, timestamp: new Date() }]);
     }, []);
@@ -217,7 +171,6 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         
-        // Use a functional update to ensure isStarted is set after other state resets
         setIsStarted(true);
 
         addLog(AgentName.MASTER_PLANNER, 'Received new event goal. Starting decomposition...');
@@ -241,7 +194,7 @@ const App: React.FC = () => {
     }, [addLog, handleReset]);
 
     const processTask = useCallback(async (task: Task) => {
-        if (processingTasks.current.has(task.id)) return;
+        if (processingTasks.current.has(task.id) || task.parentId) return; // Do not process sub-tasks directly, they are manual
         
         processingTasks.current.add(task.id);
         setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.WORKING}));
@@ -287,7 +240,16 @@ const App: React.FC = () => {
             const processingTime = 2000 + Math.random() * 3000;
             const updateInterval = 100;
             const progressSteps = processingTime / updateInterval;
-            const progressIncrement = 100 / progressSteps;
+            let progressIncrement = 100 / progressSteps;
+            
+            // Do not simulate progress for parent tasks; their progress is derived from sub-tasks
+            const subTasks = tasks.filter(t => t.parentId === task.id);
+            if (subTasks.length > 0) {
+                 addLog(task.assignedTo, `Task "${task.title}" is a parent task. Its progress will be determined by its sub-tasks.`);
+                 processingTasks.current.delete(task.id);
+                 return;
+            }
+
 
             if (progressIntervals.current[task.id]) {
                 clearInterval(progressIntervals.current[task.id]);
@@ -307,7 +269,6 @@ const App: React.FC = () => {
                 clearInterval(progressIntervals.current[task.id]);
                 delete progressIntervals.current[task.id];
                 
-                // Task work is finished, but it now waits for the user to manually mark it as complete.
                 setTasks(prev => prev.map(t => t.id === task.id ? {...t, progress: 100} : t));
                 addLog(task.assignedTo, `Task "${task.title}" work is finished. Awaiting manual completion.`);
                 setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.IDLE}));
@@ -316,12 +277,11 @@ const App: React.FC = () => {
             }, processingTime);
         }
 
-    }, [addLog]);
+    }, [addLog, tasks]);
 
     useEffect(() => {
         const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
         
-        // Tasks that have an absolute start date do not need to wait for dependencies
         const tasksToStart = tasks.filter(task => 
             task.status === TaskStatus.PENDING && 
             (task.startDate || (task.dependsOn || []).every(depId => completedTaskIds.has(depId)))
@@ -343,38 +303,6 @@ const App: React.FC = () => {
         );
         tasksToProcess.forEach(task => processTask(task));
     }, [tasks, processTask]);
-
-    useEffect(() => {
-        const agentsToUpdate: Partial<Record<AgentName, AgentStatus>> = {};
-        const workToUpdate: Partial<Record<AgentName, string | null>> = {};
-
-        const workingAgents = (Object.keys(agentStatus) as AgentName[]).filter(
-            agentName => agentStatus[agentName] === AgentStatus.WORKING
-        );
-
-        for (const agentName of workingAgents) {
-             if (agentName === AgentName.MASTER_PLANNER) continue;
-
-            const hasInProgressTasks = tasks.some(
-                t => t.assignedTo === agentName && t.status === TaskStatus.IN_PROGRESS
-            );
-            
-            const hasAwaitingApprovalTasks = approvals.some(
-                a => a.agent === agentName && a.status === 'pending'
-            );
-
-            if (!hasInProgressTasks && hasAwaitingApprovalTasks) {
-                addLog(agentName, `Submitted work for review. Returning to idle state.`);
-                agentsToUpdate[agentName] = AgentStatus.IDLE;
-                workToUpdate[agentName] = null;
-            }
-        }
-        
-        if (Object.keys(agentsToUpdate).length > 0) {
-            setAgentStatus(prev => ({ ...prev, ...agentsToUpdate }));
-            setAgentWork(prev => ({ ...prev, ...workToUpdate }));
-        }
-    }, [tasks, agentStatus, addLog, approvals]);
 
     useEffect(() => {
         return () => {
@@ -401,7 +329,7 @@ const App: React.FC = () => {
                     status: TaskStatus.COMPLETED, 
                     progress: 100,
                     approvedContent: newContent ?? approval.content,
-                    customPrompt: undefined, // Clear custom prompt on approval
+                    customPrompt: undefined,
                 } : t));
                 addLog(relatedTask.assignedTo, `Task approved: "${relatedTask.title}". Finalizing.`);
             } else {
@@ -414,8 +342,8 @@ const App: React.FC = () => {
                     status: TaskStatus.IN_PROGRESS, 
                     progress: 0, 
                     retries: 0, 
-                    customPrompt: customPrompt, // Set custom prompt for regeneration
-                    approvedContent: undefined // Clear previous content
+                    customPrompt: customPrompt,
+                    approvedContent: undefined
                 } : t));
                  addLog(relatedTask.assignedTo, logMessage);
             }
@@ -426,7 +354,7 @@ const App: React.FC = () => {
         const task = tasks.find(t => t.id === taskId);
         if (task) {
              addLog(AgentName.MASTER_PLANNER, `User marked task "${task.title}" as complete.`);
-             setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: TaskStatus.COMPLETED} : t));
+             setTasks(prev => prev.map(t => t.id === taskId ? {...t, status: TaskStatus.COMPLETED, progress: 100} : t));
         }
     }, [tasks, addLog]);
     
@@ -446,31 +374,23 @@ const App: React.FC = () => {
             : t
         ));
     }, [tasks, addLog]);
-
-    const handleTaskUpdate = useCallback((taskId: string, updates: Partial<Task>) => {
-        setTasks(prevTasks => prevTasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
-        const updatedTask = tasks.find(t => t.id === taskId);
-        if (updatedTask) {
-             addLog(AgentName.MASTER_PLANNER, `Task "${updatedTask.title}" was rescheduled via the timeline.`);
-        }
-    }, [tasks, addLog]);
     
+    const handleUpdateTask = useCallback((taskId: string, updates: Partial<Task>) => {
+        setTasks(prevTasks => prevTasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
+    }, []);
+
     const handleGanttSaveChanges = useCallback((orderedTasks: Task[]) => {
         addLog(AgentName.MASTER_PLANNER, "Timeline saved. Resetting all tasks and clearing previous results to start the new plan from a clean slate.");
 
-        // The Gantt component has determined the new task order, dependencies, and start dates.
-        // We trust this new structure completely.
-        // We reset all execution state to kick off the new plan from scratch.
         const newPlanTasks = orderedTasks.map(task => ({
             ...task,
             status: TaskStatus.PENDING,
             progress: 0,
             retries: 0,
-            approvedContent: undefined, // Clear any previous results
+            approvedContent: undefined,
         }));
 
         setTasks(newPlanTasks);
-        // Also clear any pending approvals from the old plan, as they are now invalid.
         setApprovals([]);
     }, [addLog]);
 
@@ -493,12 +413,12 @@ const App: React.FC = () => {
                         onReassignTask={handleReassignTask}
                         onTaskClick={setSelectedTask}
                         onViewResult={setViewingResultTask}
-                        onTaskUpdate={handleTaskUpdate}
+                        onTaskUpdate={handleUpdateTask}
                         onGanttSaveChanges={handleGanttSaveChanges}
                     />
                 )}
             </main>
-            {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} />}
+            {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} onTaskUpdate={handleUpdateTask} />}
             {viewingResultTask && <ResultModal task={viewingResultTask} onClose={() => setViewingResultTask(null)} />}
         </div>
     );
