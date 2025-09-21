@@ -107,6 +107,8 @@ const App: React.FC = () => {
     useEffect(() => {
         const taskMap = new Map(tasks.map(t => [t.id, t]));
         const parentUpdates = new Map<string, { completed: number; total: number }>();
+        const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
+        const subTasksByParent = new Map<string, Task[]>();
 
         tasks.forEach(task => {
             if (task.parentId && taskMap.has(task.parentId)) {
@@ -118,6 +120,11 @@ const App: React.FC = () => {
                 if (task.status === TaskStatus.COMPLETED) {
                     stats.completed += 1;
                 }
+
+                if (!subTasksByParent.has(task.parentId)) {
+                    subTasksByParent.set(task.parentId, []);
+                }
+                subTasksByParent.get(task.parentId)!.push(task);
             }
         });
 
@@ -138,6 +145,15 @@ const App: React.FC = () => {
                             newStatus = TaskStatus.COMPLETED;
                         } else if (!allSubtasksCompleted && parentTask.status === TaskStatus.COMPLETED) {
                             newStatus = TaskStatus.IN_PROGRESS; // Revert to In Progress
+                        } else if (parentTask.status === TaskStatus.PENDING) {
+                            const subTasks = subTasksByParent.get(parentTask.id) || [];
+                            const isAnySubtaskReady = subTasks.some(sub => 
+                                (sub.dependsOn || []).every(depId => completedTaskIds.has(depId))
+                            );
+
+                            if (isAnySubtaskReady) {
+                                newStatus = TaskStatus.IN_PROGRESS;
+                            }
                         }
 
                         if (parentTask.progress !== newProgress || parentTask.status !== newStatus) {
@@ -158,6 +174,8 @@ const App: React.FC = () => {
                                 addLog(newTask.assignedTo, `All sub-tasks for "${newTask.title}" are complete. Marking parent task as complete.`);
                             } else if (originalTask.status === TaskStatus.COMPLETED) {
                                 addLog(newTask.assignedTo, `A sub-task for "${newTask.title}" is no longer complete. Reverting parent task to In Progress.`);
+                            } else if (newTask.status === TaskStatus.IN_PROGRESS) {
+                                addLog(AgentName.MASTER_PLANNER, `A sub-task for "${newTask.title}" is ready. Marking parent task as In Progress.`);
                             }
                         }
                     });
@@ -169,16 +187,18 @@ const App: React.FC = () => {
     }, [tasks, addLog]);
     
     useEffect(() => {
-        // This effect declaratively syncs agent status based on the current state of tasks.
         const activeTasksByAgent: Record<AgentName, Task[]> = AGENT_NAMES.reduce(
             (acc, name) => ({ ...acc, [name]: [] }),
             {} as Record<AgentName, Task[]>
         );
+
+        // Identify all parent tasks. A parent task is any task that is referenced in another task's `parentId`.
+        const parentTaskIds = new Set(tasks.map(t => t.parentId).filter((id): id is string => !!id));
         
         // An "active" task is one an agent is currently supposed to be working on.
-        // This includes tasks in progress that haven't hit 100% simulated work yet.
+        // It must be an executable task (not a parent container), be in progress, and not yet finished.
         tasks.forEach(task => {
-            if (task.status === TaskStatus.IN_PROGRESS && (task.progress ?? 0) < 100) {
+            if (!parentTaskIds.has(task.id) && task.status === TaskStatus.IN_PROGRESS && (task.progress ?? 0) < 100) {
                  activeTasksByAgent[task.assignedTo].push(task);
             }
         });
@@ -196,24 +216,21 @@ const App: React.FC = () => {
             const currentStatus = agentStatus[agentName];
 
             if (isWorking) {
-                // If agent is not working (and not in an error state), set to working.
                 if (currentStatus !== AgentStatus.WORKING && currentStatus !== AgentStatus.ERROR) {
                     newAgentStatus[agentName] = AgentStatus.WORKING;
                     statusHasChanged = true;
                 }
-                // Update work to the first active task.
-                const newWork = activeTasks[0].title;
+                // Update work to the first active task. This will now always be an executable task.
+                const newWork = activeTasks[0].id;
                 if (agentWork[agentName] !== newWork) {
                     newAgentWork[agentName] = newWork;
                     workHasChanged = true;
                 }
             } else { // Agent has no active tasks.
-                // If agent was working, set to idle.
                 if (currentStatus === AgentStatus.WORKING) {
                     newAgentStatus[agentName] = AgentStatus.IDLE;
                     statusHasChanged = true;
                 }
-                // Clear work when idle.
                 if (agentWork[agentName] !== null) {
                     newAgentWork[agentName] = null;
                     workHasChanged = true;
@@ -221,14 +238,12 @@ const App: React.FC = () => {
             }
         });
         
-        // Batch updates to avoid multiple re-renders.
         if (statusHasChanged) {
             setAgentStatus(newAgentStatus);
         }
         if (workHasChanged) {
             setAgentWork(newAgentWork);
         }
-    // agentStatus and agentWork are included to ensure we're comparing against the latest state.
     }, [tasks, agentStatus, agentWork]);
 
 
@@ -379,8 +394,10 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
+        const parentTaskIds = new Set(tasks.map(t => t.parentId).filter((id): id is string => !!id));
         
         const tasksToStart = tasks.filter(task => 
+            !parentTaskIds.has(task.id) &&
             task.status === TaskStatus.PENDING && 
             (task.startDate || (task.dependsOn || []).every(depId => completedTaskIds.has(depId)))
         );
