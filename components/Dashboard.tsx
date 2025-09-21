@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Task, Approval, ActivityLog, AgentName, AgentStatus, TaskStatus } from '../types';
 import { AGENT_NAMES, AGENT_DETAILS, AGENT_STATUS_STYLES } from '../constants';
@@ -13,9 +14,10 @@ import { XCircleIcon } from './icons/XCircleIcon';
 interface AgentStatusGridProps {
     agentStatus: Record<AgentName, AgentStatus>;
     agentWork: Record<AgentName, string | null>;
+    tasks: Task[];
 }
 
-const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatus, agentWork }) => {
+const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatus, agentWork, tasks }) => {
     return (
         <div className="bg-secondary p-4 rounded-xl h-96 shadow-inner border border-accent flex flex-col">
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow overflow-y-auto pr-2 -mr-3">
@@ -26,6 +28,16 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
                     const statusStyle = AGENT_STATUS_STYLES[status];
                     const AgentIcon = agentDetail.icon;
                     const StatusIcon = statusStyle.icon;
+                    
+                    // Find the specific task that's in progress for this agent
+                    const currentTask = work 
+                        ? tasks.find(t => 
+                            t.title === work && 
+                            t.assignedTo === agentName &&
+                            t.status === TaskStatus.IN_PROGRESS) 
+                        : null;
+                    const parentTask = currentTask?.parentId ? tasks.find(t => t.id === currentTask.parentId) : null;
+
 
                     return (
                         <div key={agentName} className="bg-primary p-4 rounded-lg border border-accent flex flex-col justify-between">
@@ -41,10 +53,23 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
                                     {StatusIcon && <StatusIcon className={`w-4 h-4 mr-2 ${status === AgentStatus.WORKING ? 'animate-spin' : ''}`} />}
                                     <span>{status}</span>
                                 </div>
-                                {work && (
-                                    <p className="text-xs text-text-secondary mt-1 bg-secondary px-2 py-1 rounded-md truncate" title={work}>
-                                        Task: {work}
-                                    </p>
+                                {currentTask && (
+                                    <div className="text-xs mt-1 bg-secondary px-2 py-1.5 rounded-md space-y-1">
+                                        {parentTask ? (
+                                            <>
+                                                <p className="truncate text-text-secondary" title={parentTask.title}>
+                                                    <span className="font-semibold text-gray-500">Parent:</span> {parentTask.title}
+                                                </p>
+                                                <p className="truncate font-medium text-light" title={currentTask.title}>
+                                                    <span className="font-semibold text-gray-500">Subtask:</span> {currentTask.title}
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <p className="truncate font-medium text-light" title={currentTask.title}>
+                                                <span className="font-semibold text-gray-500">Task:</span> {currentTask.title}
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -198,7 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <h2 className="text-xl font-bold mb-4 text-highlight">2. Monitor Agent Status & Activity</h2>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                     <div className="lg:col-span-3">
-                         <AgentStatusGrid agentStatus={agentStatus} agentWork={agentWork} />
+                         <AgentStatusGrid agentStatus={agentStatus} agentWork={agentWork} tasks={tasks} />
                     </div>
                     <div className="lg:col-span-2">
                         <AgentActivityFeed logs={logs} />
