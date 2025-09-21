@@ -10,78 +10,133 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 /**
  * MOCK IMPLEMENTATION FOR OFFLINE USE
+ * A comprehensive mock plan to test all application features at once.
  */
 
 const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
-    console.log("Decomposing goal (offline mock):", goal);
+    console.log("Decomposing goal (Comprehensive Offline Mock):", goal);
     const mockPlan: Partial<Task>[] = [
+        // --- Parent Task for Logistics ---
+        {
+            id: "secure-logistics",
+            title: "Secure Event Logistics",
+            description: "Oversee all logistical arrangements including venue, AV, and catering.",
+            assignedTo: AgentName.LOGISTICS_COORDINATOR,
+            dependsOn: [],
+            estimatedDuration: 8, // Sum of its longest sequential chain of sub-tasks
+        },
+        // --- Logistics Sub-tasks ---
         {
             id: "select-venue",
             title: "Select and Book Venue",
-            description: "Research and book a suitable venue for a 3-day event for 50 people.",
+            description: "Research and book a suitable venue for a 3-day tech conference for 200 people.",
             assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: [],
+            dependsOn: [], // No dependencies, can start immediately
             estimatedDuration: 3,
+            parentId: "secure-logistics",
         },
         {
-            id: "develop-sponsorship-packages",
-            title: "Develop Sponsorship Packages",
-            description: "Create tiered sponsorship packages with different benefits (e.g., Gold, Silver, Bronze).",
-            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
-            dependsOn: [],
+            id: "arrange-av",
+            title: "Arrange AV Equipment",
+            description: "Coordinate with vendors for stage, sound, and lighting.",
+            assignedTo: AgentName.LOGISTICS_COORDINATOR,
+            dependsOn: ["select-venue"], // Must happen after venue is booked
             estimatedDuration: 2,
-        },
-        {
-            id: "send-sponsorship-emails",
-            title: "Send Initial Sponsorship Emails",
-            description: "Draft and send personalized outreach emails to a pre-approved list of 10 potential sponsors.",
-            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
-            dependsOn: ["develop-sponsorship-packages"],
-            estimatedDuration: 2,
-        },
-        {
-            id: "announce-event-social-media",
-            title: "Announce Event on Social Media",
-            description: "Create an engaging social media post to announce the robotics competition, including date, venue, and a call for early registration.",
-            assignedTo: AgentName.MARKETING,
-            dependsOn: ["select-venue"],
-            estimatedDuration: 1,
+            parentId: "secure-logistics",
         },
         {
             id: "arrange-catering",
-            title: "Arrange Catering",
-            description: "Oversee the entire catering arrangement process for the 3-day event.",
+            title: "Finalize Catering",
+            description: "Get quotes and sign a contract for event catering.",
             assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["select-venue"],
-            estimatedDuration: 4,
+            dependsOn: ["select-venue"], // Also depends on venue
+            estimatedDuration: 3,
+            parentId: "secure-logistics",
         },
+
+        // --- Parent Task for Sponsorship ---
         {
-            id: "research-caterers",
-            title: "Research Potential Caterers",
-            description: "Find 5 potential caterers who can handle a 3-day event for 50 people and have good reviews.",
-            assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["select-venue"], // Inherited from parent
-            estimatedDuration: 1,
-            parentId: "arrange-catering",
+            id: "manage-sponsorship",
+            title: "Manage Sponsorship Campaign",
+            description: "Develop sponsorship packages, conduct outreach, and secure funding.",
+            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
+            dependsOn: [],
+            estimatedDuration: 7,
         },
+        // --- Sponsorship Sub-tasks ---
         {
-            id: "get-catering-quotes",
-            title: "Get Catering Quotes",
-            description: "Contact the researched caterers and get detailed quotes, including menus and pricing.",
-            assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["research-caterers", "select-venue"], // Sequential + Inherited
+            id: "develop-sponsorship-packages",
+            title: "Develop Sponsorship Tiers",
+            description: "Create tiered sponsorship packages (e.g., Platinum, Gold, Silver) with clear benefits.",
+            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
+            dependsOn: [], // Can start immediately
             estimatedDuration: 2,
-            parentId: "arrange-catering",
+            parentId: "manage-sponsorship",
         },
         {
-            id: "sign-catering-contract",
-            title: "Sign Catering Contract",
-            description: "Finalize the choice of caterer, review, and sign the contract.",
-            assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["get-catering-quotes", "select-venue"], // Sequential + Inherited
-            estimatedDuration: 1,
-            parentId: "arrange-catering",
-        }
+            id: "draft-sponsorship-email",
+            title: "Draft Initial Sponsorship Email",
+            description: "Draft a compelling and personalized outreach email template for potential sponsors.",
+            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
+            dependsOn: ["develop-sponsorship-packages"], // Depends on tiers being defined
+            estimatedDuration: 1, // This is a content generation task
+            parentId: "manage-sponsorship",
+        },
+        {
+            id: "send-sponsorship-emails",
+            title: "Send Wave 1 Sponsorship Emails",
+            description: "Send the approved email to a pre-vetted list of 20 potential sponsors.",
+            assignedTo: AgentName.SPONSORSHIP_OUTREACH,
+            dependsOn: ["draft-sponsorship-email"], // Depends on email being approved
+            estimatedDuration: 2,
+            parentId: "manage-sponsorship",
+        },
+
+        // --- Parent Task for Marketing ---
+        {
+            id: "execute-marketing-plan",
+            title: "Execute Marketing Plan",
+            description: "Oversee all marketing activities to promote the event and drive ticket sales.",
+            assignedTo: AgentName.MARKETING,
+            dependsOn: ["select-venue"], // Marketing needs a venue to announce
+            estimatedDuration: 6,
+        },
+        // --- Marketing Sub-tasks ---
+        {
+            id: "create-brand-identity",
+            title: "Create Event Brand Identity",
+            description: "Develop a logo, color scheme, and overall visual identity for the conference.",
+            assignedTo: AgentName.MARKETING,
+            dependsOn: [], // Can be done in parallel at the start
+            estimatedDuration: 3,
+        },
+        {
+            id: "announce-event-social-media",
+            title: "Create 'Save the Date' Post",
+            description: "Create an engaging social media post to announce the conference, including date and venue.",
+            assignedTo: AgentName.MARKETING,
+            dependsOn: ["select-venue", "create-brand-identity"], // Depends on both logistics and branding
+            estimatedDuration: 1, // Content generation task
+            parentId: "execute-marketing-plan",
+        },
+        {
+            id: "launch-event-website",
+            title: "Launch Simple Event Website",
+            description: "Build and deploy a one-page website with key event details and a sign-up form.",
+            assignedTo: AgentName.LOGISTICS_COORDINATOR, // A technical task for logistics
+            dependsOn: ["create-brand-identity"],
+            estimatedDuration: 4,
+            parentId: "execute-marketing-plan",
+        },
+        {
+            id: "announce-keynote-speaker",
+            title: "Announce Keynote Speaker",
+            description: "Create a social media campaign to announce the confirmed keynote speaker.",
+            assignedTo: AgentName.MARKETING,
+            dependsOn: ["launch-event-website"], // Announce after website is live
+            estimatedDuration: 1, // Content generation task
+            parentId: "execute-marketing-plan",
+        },
     ];
 
     const fullTasks = mockPlan.map(task => ({
@@ -99,26 +154,44 @@ const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
 };
 
 const mockExecuteTask = (task: Task): Promise<string> => {
-    console.log(`Executing task (offline mock): "${task.title}"`);
-    let mockContent = "";
+    console.log(`Executing task (Comprehensive Offline Mock): "${task.title}"`);
+    let mockContent = "Default mock content. If you see this, the task title might not be matched in mockExecuteTask.";
 
-    if (task.assignedTo === AgentName.MARKETING) {
-        mockContent = `🚀 Get ready, innovators! FestFlow is proud to announce our 3-day Robotics Competition from Oct 1-3! 🤖 Join 50 of the brightest minds as they battle for the top spot. Venue details are confirmed! Early bird registration opens next week. Don't miss out! #Robotics #TechEvent #Competition #FestFlow`;
-    } else if (task.assignedTo === AgentName.SPONSORSHIP_OUTREACH) {
-        mockContent = `Subject: Partnership Opportunity: The Annual FestFlow Robotics Competition
+    switch (task.id) {
+        case "draft-sponsorship-email":
+            mockContent = `Subject: Partnership Opportunity: The Annual FestFlow Tech Conference
 
 Dear [Sponsor Name],
 
-I am writing to invite you to partner with us for the upcoming FestFlow Robotics Competition, a 3-day event taking place from October 1st to 3rd. We are expecting 50 of the top robotics enthusiasts and significant media coverage.
+I am writing to invite you to partner with us for the upcoming FestFlow Tech Conference, a premier 3-day event gathering 200 industry leaders and innovators.
 
-We believe a partnership would offer great value to your brand. Our sponsorship packages are attached for your review.
+We believe a partnership would offer exceptional value and exposure for your brand. Our detailed sponsorship packages are attached for your review, outlining various tiers of benefits.
 
-We would be delighted to discuss this opportunity further.
+We would be delighted to schedule a brief call to discuss this opportunity further.
 
 Best regards,
 
 Sponsorship Outreach Agent
 FestFlow`;
+            break;
+        case "announce-event-social-media":
+            mockContent = `🚀 BIG NEWS! Announcing the FestFlow Tech Conference 2024! 🤖
+
+Join us for 3 days of innovation, networking, and groundbreaking tech.
+📅 October 22-24, 2024
+📍 The Grand Expo Center
+
+Get ready to connect with 200 of the brightest minds in the industry. Early bird tickets drop next month! Don't miss out. #TechConference #Innovation #FestFlow2024 #SaveTheDate`;
+            break;
+        case "announce-keynote-speaker":
+            mockContent = `🎤 Keynote Speaker Announcement! 🎤
+
+We are thrilled to announce that the legendary Dr. Evelyn Reed, a pioneer in artificial intelligence, will be our keynote speaker at the FestFlow Tech Conference!
+
+Get ready for an inspiring session on the future of AI and robotics. You won't want to miss this!
+
+Learn more on our new website: FestFlowConf.com #Keynote #AI #TechEvent #FestFlow2024`;
+            break;
     }
 
      return new Promise(resolve => {
