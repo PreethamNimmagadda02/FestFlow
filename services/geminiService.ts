@@ -60,7 +60,7 @@ const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
             title: "Research Potential Caterers",
             description: "Find 5 potential caterers who can handle a 3-day event for 50 people and have good reviews.",
             assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: [],
+            dependsOn: ["select-venue"], // Inherited from parent
             estimatedDuration: 1,
             parentId: "arrange-catering",
         },
@@ -69,7 +69,7 @@ const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
             title: "Get Catering Quotes",
             description: "Contact the researched caterers and get detailed quotes, including menus and pricing.",
             assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["research-caterers"],
+            dependsOn: ["research-caterers", "select-venue"], // Sequential + Inherited
             estimatedDuration: 2,
             parentId: "arrange-catering",
         },
@@ -78,7 +78,7 @@ const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
             title: "Sign Catering Contract",
             description: "Finalize the choice of caterer, review, and sign the contract.",
             assignedTo: AgentName.LOGISTICS_COORDINATOR,
-            dependsOn: ["get-catering-quotes"],
+            dependsOn: ["get-catering-quotes", "select-venue"], // Sequential + Inherited
             estimatedDuration: 1,
             parentId: "arrange-catering",
         }
@@ -187,12 +187,17 @@ You have a team of specialized agents to delegate tasks to:
 Your instructions are:
 1.  Analyze the user's goal carefully.
 2.  Break it down into a logical sequence of specific, actionable tasks.
-3.  For complex tasks (e.g., "Arrange Catering"), create a main parent task and then several sub-tasks linked to it via a 'parentId'. Sub-tasks should have their own dependencies if they are sequential.
-4.  Assign each task to the most appropriate agent from the list above.
-5.  Define dependencies between tasks. A task's 'dependsOn' array should contain the 'id's of all tasks that must be completed before it can start. For example, a marketing post about the venue can only be created after the venue is booked.
-6.  Generate a unique, URL-friendly slug for each task 'id'.
-7.  Provide a realistic 'estimatedDuration' in days for each task. The duration should be a whole number greater than 0.
-8.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
+3.  For complex tasks (e.g., "Arrange Catering"), create a main **parent task** to act as an organizational container, and then several **sub-tasks** linked to it via a 'parentId'.
+4.  Crucially, when creating parent and sub-tasks, follow these rules:
+    - Parent tasks are non-executable containers for organization. Their status is derived from their children.
+    - A parent task's 'estimatedDuration' should be a rough sum of its sequential sub-tasks' durations.
+    - **Sub-task Dependency Rule:** Sub-tasks MUST inherit all prerequisites from their parent task. Additionally, sub-tasks CAN have dependencies on other sub-tasks under the same parent to create a logical sequence.
+    - **Example:** If parent "Arrange Catering" depends on "Select Venue", then its sub-task "Get Quotes" MUST also depend on "Select Venue". "Get Quotes" could ALSO depend on a sibling sub-task like "Research Caterers".
+5.  Assign each task to the most appropriate agent from the list above.
+6.  Define dependencies between tasks. A task's 'dependsOn' array should contain the 'id's of all tasks that must be completed before it can start. For example, a marketing post about the venue can only be created after the venue is booked.
+7.  Generate a unique, URL-friendly slug for each task 'id'.
+8.  Provide a realistic 'estimatedDuration' in days for each task. The duration should be a whole number greater than 0.
+9.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
     
     const taskSchema = {
         type: Type.OBJECT,
@@ -242,6 +247,19 @@ Your instructions are:
         const jsonStr = response.text.trim();
         const decomposedTasks = JSON.parse(jsonStr) as Task[];
         
+        // Post-process to enforce sub-task dependency inheritance as a safeguard
+        const taskMap = new Map(decomposedTasks.map(t => [t.id, t]));
+        decomposedTasks.forEach(task => {
+            if (task.parentId) {
+                const parent = taskMap.get(task.parentId);
+                if (parent && parent.dependsOn && parent.dependsOn.length > 0) {
+                    const childDeps = new Set(task.dependsOn || []);
+                    parent.dependsOn.forEach(dep => childDeps.add(dep));
+                    task.dependsOn = Array.from(childDeps);
+                }
+            }
+        });
+
         // Post-process tasks to add app-specific state properties
         return decomposedTasks.map(task => ({
             ...task,
