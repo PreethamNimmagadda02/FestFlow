@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Task, TaskStatus } from '../types';
 import { AGENT_DETAILS } from '../constants';
 import { UndoIcon } from './icons/UndoIcon';
+import { CheckCircleIcon } from './icons/CheckCircleIcon';
+import { ClockIcon } from './icons/ClockIcon';
 
 // A simple date utility library to avoid external dependencies
 const dateUtils = {
@@ -174,6 +176,8 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
 interface TooltipData {
     content: {
         prerequisites: string[];
+        subTasks: { title: string, status: TaskStatus }[];
+        isParent: boolean;
         startDay: number;
         endDay: number;
         duration: number;
@@ -202,13 +206,14 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         setHistory([]);
     }, [tasks]);
 
-    const { ganttTasks, chartStartDate, totalDays, projectStartDate } = useMemo(() => {
+    const { ganttTasks, chartStartDate, totalDays, projectStartDate, parentIds } = useMemo(() => {
         if (tasks.length === 0) {
             const today = new Date();
             today.setHours(0,0,0,0);
             return {
                 ganttTasks: [], chartStartDate: today,
                 totalDays: 35, projectStartDate: today,
+                parentIds: new Set<string>(),
             };
         }
         
@@ -228,8 +233,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         const chartEndDate = maxDate;
         let totalDays = calculatedGanttTasks.length > 0 ? dateUtils.getDaysBetween(chartStartDate, chartEndDate) : 35;
         totalDays = Math.max(totalDays, 35);
+
+        const parentIds = new Set(orderedTasks.map(t => t.parentId).filter((id): id is string => !!id));
         
-        return { ganttTasks: calculatedGanttTasks, chartStartDate, totalDays, projectStartDate };
+        return { ganttTasks: calculatedGanttTasks, chartStartDate, totalDays, projectStartDate, parentIds };
     }, [orderedTasks, tasks]);
 
     const timelineDates: Date[] = useMemo(() => {
@@ -534,7 +541,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     };
 
     const relatedTaskIds = useMemo(() => {
-        if (!isEditing || !hoveredTaskId) {
+        if (!hoveredTaskId) {
             return new Set();
         }
 
@@ -542,7 +549,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         allPrereqIds.add(hoveredTaskId);
 
         return allPrereqIds;
-    }, [isEditing, hoveredTaskId, orderedTasks]);
+    }, [hoveredTaskId, orderedTasks]);
 
     if (tasks.length === 0) {
         return (
@@ -552,7 +559,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         );
     }
     
-    const tooltipPortal = isEditing ? createPortal(
+    const tooltipPortal = createPortal(
         <div
             ref={tooltipRef}
             className="fixed z-50 p-4 bg-primary rounded-xl border border-accent shadow-2xl w-64 pointer-events-none transition-opacity duration-200"
@@ -577,6 +584,24 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                             </div>
                         </div>
                     </div>
+                    {tooltipData.content.isParent && tooltipData.content.subTasks.length > 0 && (
+                        <div className="border-t border-accent pt-2">
+                            <h5 className="text-sm font-bold text-highlight mb-1">Sub-Tasks</h5>
+                            <ul className="list-disc list-inside text-sm text-light space-y-1 max-h-24 overflow-y-auto">
+                                {tooltipData.content.subTasks.map((sub, i) => (
+                                    <li key={i} className="truncate flex items-center">
+                                        {sub.status === TaskStatus.COMPLETED ? 
+                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
+                                            <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
+                                        }
+                                        <span className={sub.status === TaskStatus.COMPLETED ? 'line-through text-text-secondary' : ''}>
+                                            {sub.title}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <div className="border-t border-accent pt-2">
                         <h5 className="text-sm font-bold text-highlight mb-1">All Prerequisites</h5>
                         {tooltipData.content.prerequisites.length > 0 ? (
@@ -591,7 +616,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             )}
         </div>,
         document.getElementById('tooltip-root')!
-    ) : null;
+    );
     
     return (
         <div className="bg-secondary rounded-xl border border-accent overflow-hidden shadow-2xl">
@@ -682,9 +707,11 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                 const agentBorderColor = agentColor.replace('text-', 'border-').replace('-400', '-400');
                                 const progress = ganttTask.status === TaskStatus.COMPLETED ? 100 : (ganttTask.progress || 0);
                                 
-                                const isHovered = isEditing && hoveredTaskId === ganttTask.id;
-                                const isRelated = isEditing && relatedTaskIds.has(ganttTask.id);
-                                const isDimmed = isEditing && hoveredTaskId && !isRelated;
+                                const isHovered = hoveredTaskId === ganttTask.id;
+                                const isRelated = relatedTaskIds.has(ganttTask.id);
+                                const isDimmed = hoveredTaskId != null && !isRelated;
+
+                                const isParent = parentIds.has(ganttTask.id);
 
                                 return (
                                     <div key={ganttTask.id} className="h-12 relative flex items-center">
@@ -693,42 +720,83 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                                  return <div key={index} className="h-full border-r border-accent"></div>
                                             })}
                                         </div>
-                                         <div
-                                            draggable={isEditing}
-                                            onDragStart={(e) => handleDragStart(e, ganttTask)}
-                                            onDragEnd={handleDragEnd}
-                                            onDrop={(e) => handleTaskBarDrop(e, ganttTask)}
-                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                            onMouseEnter={(e) => {
-                                                if (isEditing) {
+                                         {isParent ? (
+                                            <div
+                                                onMouseEnter={(e) => {
                                                     setHoveredTaskId(ganttTask.id);
-                                                    setTooltipData({
-                                                        content: {
-                                                            prerequisites: getAllPrerequisites(ganttTask.id, orderedTasks),
-                                                            startDay,
-                                                            endDay,
-                                                            duration: durationDays,
-                                                        },
-                                                        targetRect: (e.currentTarget as HTMLElement).getBoundingClientRect(),
-                                                    });
-                                                }
-                                            }}
-                                            onMouseLeave={() => {
-                                                if (isEditing) {
+                                                    if (isEditing) {
+                                                        const subTasksForTooltip = orderedTasks
+                                                            .filter(t => t.parentId === ganttTask.id)
+                                                            .map(t => ({ title: t.title, status: t.status }));
+                                                            
+                                                        setTooltipData({
+                                                            content: {
+                                                                prerequisites: getAllPrerequisites(ganttTask.id, orderedTasks),
+                                                                subTasks: subTasksForTooltip,
+                                                                isParent: true,
+                                                                startDay,
+                                                                endDay,
+                                                                duration: durationDays,
+                                                            },
+                                                            targetRect: (e.currentTarget as HTMLElement).getBoundingClientRect(),
+                                                        });
+                                                    }
+                                                }}
+                                                onMouseLeave={() => {
                                                     setHoveredTaskId(null);
                                                     setTooltipData(null);
-                                                }
-                                            }}
-                                            onClick={() => !isEditing && onTaskClick(ganttTask)}
-                                            className={`absolute h-8 rounded-md shadow-md flex items-center px-3 text-white overflow-hidden transition-all duration-300 ${agentBgColor} border-l-4 ${agentBorderColor} ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-pointer hover:opacity-80'} ${draggingTaskId === ganttTask.id ? 'opacity-50 scale-105' : ''} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'ring-2 ring-offset-2 ring-offset-secondary ring-highlight' : ''}`}
-                                            style={{
-                                                left: `${Math.max(0, offsetDays) * 4}rem`,
-                                                width: `${durationDays * 4}rem`,
-                                            }}
-                                        >
-                                            <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%`}}></div>
-                                            <span className="relative truncate font-semibold text-xs">{ganttTask.title}</span>
-                                        </div>
+                                                }}
+                                                onClick={() => !isEditing && onTaskClick(ganttTask)}
+                                                className={`absolute h-8 rounded-lg flex items-center justify-between px-0.5 text-white overflow-hidden transition-all duration-300 bg-secondary border-2 ${agentBorderColor} ${isEditing ? 'cursor-default' : 'cursor-pointer'} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'ring-2 ring-offset-2 ring-offset-secondary ring-highlight' : ''}`}
+                                                style={{
+                                                    left: `${Math.max(0, offsetDays) * 4}rem`,
+                                                    width: `${durationDays * 4}rem`,
+                                                }}
+                                                title={`${ganttTask.title} (Summary Task)`}
+                                            >
+                                                <div className={`absolute top-0 left-0 h-full rounded-md ${agentBgColor.replace('/70', '/40')}`} style={{ width: `${progress}%`}}></div>
+                                                <div className={`relative h-5 w-1.5 rounded-sm ${agentBgColor.replace('/70', '')}`} />
+                                                <span className="relative truncate font-semibold text-xs px-2">{ganttTask.title}</span>
+                                                <div className={`relative h-5 w-1.5 rounded-sm ${agentBgColor.replace('/70', '')}`} />
+                                            </div>
+                                         ) : (
+                                            <div
+                                                draggable={isEditing}
+                                                onDragStart={(e) => handleDragStart(e, ganttTask)}
+                                                onDragEnd={handleDragEnd}
+                                                onDrop={(e) => handleTaskBarDrop(e, ganttTask)}
+                                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                onMouseEnter={(e) => {
+                                                    setHoveredTaskId(ganttTask.id);
+                                                    if (isEditing) {
+                                                        setTooltipData({
+                                                            content: {
+                                                                prerequisites: getAllPrerequisites(ganttTask.id, orderedTasks),
+                                                                subTasks: [], // Not a parent, no sub-tasks
+                                                                isParent: false,
+                                                                startDay,
+                                                                endDay,
+                                                                duration: durationDays,
+                                                            },
+                                                            targetRect: (e.currentTarget as HTMLElement).getBoundingClientRect(),
+                                                        });
+                                                    }
+                                                }}
+                                                onMouseLeave={() => {
+                                                    setHoveredTaskId(null);
+                                                    setTooltipData(null);
+                                                }}
+                                                onClick={() => !isEditing && onTaskClick(ganttTask)}
+                                                className={`absolute h-8 rounded-md shadow-md flex items-center px-3 text-white overflow-hidden transition-all duration-300 ${agentBgColor} border-l-4 ${agentBorderColor} ${isEditing ? 'cursor-grab hover:scale-105' : 'cursor-pointer hover:opacity-80'} ${draggingTaskId === ganttTask.id ? 'opacity-50 scale-105' : ''} ${isDimmed ? 'opacity-30' : 'opacity-100'} ${isHovered ? 'ring-2 ring-offset-2 ring-offset-secondary ring-highlight' : ''}`}
+                                                style={{
+                                                    left: `${Math.max(0, offsetDays) * 4}rem`,
+                                                    width: `${durationDays * 4}rem`,
+                                                }}
+                                            >
+                                                <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%`}}></div>
+                                                <span className="relative truncate font-semibold text-xs">{ganttTask.title}</span>
+                                            </div>
+                                         )}
                                     </div>
                                 );
                             })}
