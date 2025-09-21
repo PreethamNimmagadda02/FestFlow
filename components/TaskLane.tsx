@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Task, AgentName, TaskStatus, AgentStatus } from '../types';
 import { AGENT_DETAILS, TASK_STATUS_STYLES, MAX_TASK_RETRIES, AGENT_NAMES } from '../constants';
@@ -42,13 +43,15 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, subTasks, allTasks
     const statusStyle = isRetrying ? TASK_STATUS_STYLES['Retrying'] : TASK_STATUS_STYLES[task.status];
     const StatusIcon = statusStyle.icon;
     const progress = task.progress ?? 0;
+    const isParent = subTasks.length > 0;
     
-    const isManuallyCompletable = (task.assignedTo === AgentName.LOGISTICS_COORDINATOR && task.status === TaskStatus.IN_PROGRESS && progress >= 100) || (isSubTask && task.status !== TaskStatus.COMPLETED);
+    // A parent task is never manually completable. Other tasks can be marked
+    // complete as long as they are 'In Progress', allowing for manual overrides.
+    const isManuallyCompletable = !isParent && task.status === TaskStatus.IN_PROGRESS;
 
     const hasApprovedContent = task.status === TaskStatus.COMPLETED && task.approvedContent;
     const isFailed = task.status === TaskStatus.FAILED;
     const isCompleted = task.status === TaskStatus.COMPLETED;
-    const isParent = subTasks.length > 0;
 
     const availableAgentsForReassignment = AGENT_NAMES.filter(name => 
         name !== AgentName.MASTER_PLANNER &&
@@ -59,6 +62,11 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, subTasks, allTasks
     const handleButtonClick = (e: React.MouseEvent, action: () => void) => {
         e.stopPropagation();
         action();
+    };
+
+    const handleToggleExpand = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsExpanded(!isExpanded);
     };
 
     const agentColor = AGENT_DETAILS[task.assignedTo].color;
@@ -72,15 +80,15 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, subTasks, allTasks
                 onClick={() => onCardClick(task)}
             >
                 <div 
-                    className={`w-full bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out group-hover:shadow-lg group-hover:shadow-highlight/20 group-hover:scale-[1.03]`}
+                    className={`w-full bg-primary p-4 rounded-xl shadow-lg border-l-4 ${isCompleted ? 'border-green-500/50' : agentBorderColor} flex flex-col justify-between transition-all duration-300 ease-in-out ${isParent ? '' : 'group-hover:shadow-lg group-hover:shadow-highlight/20 group-hover:scale-[1.03]'}`}
                 >
                     <div className={`flex-grow space-y-2 ${isCompleted ? 'opacity-60 group-hover:opacity-100' : ''} transition-opacity`}>
                         <div className="flex justify-between items-center">
                             <h4 className={`font-bold text-lg ${isCompleted ? 'text-text-secondary' : 'text-light'} ${isSubTask ? 'text-base' : ''}`}>{task.title}</h4>
                              {isParent && (
-                                <button onClick={(e) => handleButtonClick(e, () => setIsExpanded(!isExpanded))} className="p-1 rounded-full hover:bg-accent">
+                                <div className="p-1 rounded-full hover:bg-accent" onClick={handleToggleExpand}>
                                     <ChevronDownIcon className={`w-5 h-5 text-text-secondary transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                                </button>
+                                </div>
                             )}
                         </div>
                         <p className="text-sm text-text-secondary truncate">{task.description}</p>
@@ -253,3 +261,4 @@ export const TaskLane: React.FC<TaskLaneProps> = React.memo(({ agentName, tasks,
         </div>
     );
 });
+
