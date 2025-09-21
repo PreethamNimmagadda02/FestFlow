@@ -29,12 +29,9 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
                     const AgentIcon = agentDetail.icon;
                     const StatusIcon = statusStyle.icon;
                     
-                    // Find the specific task that's in progress for this agent
+                    // Find the specific task that's in progress for this agent using its ID
                     const currentTask = work 
-                        ? tasks.find(t => 
-                            t.title === work && 
-                            t.assignedTo === agentName &&
-                            t.status === TaskStatus.IN_PROGRESS) 
+                        ? tasks.find(t => t.id === work) 
                         : null;
                     const parentTask = currentTask?.parentId ? tasks.find(t => t.id === currentTask.parentId) : null;
 
@@ -53,7 +50,7 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
                                     {StatusIcon && <StatusIcon className={`w-4 h-4 mr-2 ${status === AgentStatus.WORKING ? 'animate-spin' : ''}`} />}
                                     <span>{status}</span>
                                 </div>
-                                {currentTask && (
+                                {currentTask ? (
                                     <div className="text-xs mt-1 bg-secondary px-2 py-1.5 rounded-md space-y-1">
                                         {parentTask ? (
                                             <>
@@ -70,6 +67,12 @@ const AgentStatusGrid: React.FC<AgentStatusGridProps> = React.memo(({ agentStatu
                                             </p>
                                         )}
                                     </div>
+                                ) : work && ( // Fallback for Master Planner which uses a string description
+                                     <div className="text-xs mt-1 bg-secondary px-2 py-1.5 rounded-md">
+                                        <p className="truncate font-medium text-light" title={work}>
+                                            <span className="font-semibold text-gray-500">Task:</span> {work}
+                                        </p>
+                                     </div>
                                 )}
                             </div>
                         </div>
