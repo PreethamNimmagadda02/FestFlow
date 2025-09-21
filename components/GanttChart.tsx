@@ -119,6 +119,33 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
             }
         });
     }
+    
+    // Second pass to adjust parent task dates to be containers for their children
+    const parentChildMap = new Map<string, string[]>();
+    tasks.forEach(task => {
+        if (task.parentId) {
+            if (!parentChildMap.has(task.parentId)) {
+                parentChildMap.set(task.parentId, []);
+            }
+            parentChildMap.get(task.parentId)!.push(task.id);
+        }
+    });
+
+    parentChildMap.forEach((childrenIds, parentId) => {
+        const parentGanttTask = ganttTaskMap.get(parentId);
+        if (parentGanttTask) {
+            const childrenGanttTasks = childrenIds.map(id => ganttTaskMap.get(id)).filter((t): t is GanttTask => !!t);
+
+            if (childrenGanttTasks.length > 0) {
+                const childStartTimes = childrenGanttTasks.map(c => c.ganttStartDate.getTime());
+                const childEndTimes = childrenGanttTasks.map(c => c.ganttEndDate.getTime());
+                
+                parentGanttTask.ganttStartDate = new Date(Math.min(...childStartTimes));
+                parentGanttTask.ganttEndDate = new Date(Math.max(...childEndTimes));
+            }
+        }
+    });
+
 
     const finalGanttTasks = tasks.map(task => ganttTaskMap.get(task.id)!).filter(Boolean);
 
