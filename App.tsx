@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { EventSetupForm } from './components/FestivalSetupForm';
@@ -98,17 +99,21 @@ const App: React.FC = () => {
         }
     }, [tasks, selectedTask]);
     
-    // Automatically calculate progress for parent tasks
+    const addLog = useCallback((agent: AgentName, message: string) => {
+        setLogs(prev => [...prev, { agent, message, timestamp: new Date() }]);
+    }, []);
+
+    // Automatically calculate progress and status for parent tasks
     useEffect(() => {
         const taskMap = new Map(tasks.map(t => [t.id, t]));
-        const parentProgressUpdates = new Map<string, { completed: number; total: number }>();
+        const parentUpdates = new Map<string, { completed: number; total: number }>();
 
         tasks.forEach(task => {
             if (task.parentId && taskMap.has(task.parentId)) {
-                if (!parentProgressUpdates.has(task.parentId)) {
-                    parentProgressUpdates.set(task.parentId, { completed: 0, total: 0 });
+                if (!parentUpdates.has(task.parentId)) {
+                    parentUpdates.set(task.parentId, { completed: 0, total: 0 });
                 }
-                const stats = parentProgressUpdates.get(task.parentId)!;
+                const stats = parentUpdates.get(task.parentId)!;
                 stats.total += 1;
                 if (task.status === TaskStatus.COMPLETED) {
                     stats.completed += 1;
@@ -116,32 +121,116 @@ const App: React.FC = () => {
             }
         });
 
-        if (parentProgressUpdates.size > 0) {
+        if (parentUpdates.size > 0) {
             setTasks(currentTasks => {
                 let hasChanged = false;
                 const newTasks = currentTasks.map(task => {
-                    if (parentProgressUpdates.has(task.id)) {
-                        const parent = taskMap.get(task.id)!;
-                        const stats = parentProgressUpdates.get(task.id)!;
+                    // Check if the current task is a parent task that needs updating
+                    if (parentUpdates.has(task.id)) {
+                        const parentTask = task; // for clarity
+                        const stats = parentUpdates.get(parentTask.id)!;
                         const newProgress = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+                        const allSubtasksCompleted = stats.total > 0 && stats.completed === stats.total;
 
-                        if (parent.progress !== newProgress) {
+                        let newStatus = parentTask.status;
+                        
+                        if (allSubtasksCompleted && parentTask.status !== TaskStatus.COMPLETED) {
+                            newStatus = TaskStatus.COMPLETED;
+                        } else if (!allSubtasksCompleted && parentTask.status === TaskStatus.COMPLETED) {
+                            newStatus = TaskStatus.IN_PROGRESS; // Revert to In Progress
+                        }
+
+                        if (parentTask.progress !== newProgress || parentTask.status !== newStatus) {
                             hasChanged = true;
-                            // Don't auto-complete parent, just update progress
-                            return { ...parent, progress: newProgress };
+                            return { ...parentTask, progress: newProgress, status: newStatus };
                         }
                     }
                     return task;
                 });
+
+                if (hasChanged) {
+                    // Log changes after calculating them to avoid issues inside the map
+                    const originalTasksMap = new Map(currentTasks.map(t => [t.id, t]));
+                    newTasks.forEach(newTask => {
+                        const originalTask = originalTasksMap.get(newTask.id);
+                        if(originalTask && originalTask.status !== newTask.status && parentUpdates.has(newTask.id)) {
+                            if(newTask.status === TaskStatus.COMPLETED) {
+                                addLog(newTask.assignedTo, `All sub-tasks for "${newTask.title}" are complete. Marking parent task as complete.`);
+                            } else if (originalTask.status === TaskStatus.COMPLETED) {
+                                addLog(newTask.assignedTo, `A sub-task for "${newTask.title}" is no longer complete. Reverting parent task to In Progress.`);
+                            }
+                        }
+                    });
+                }
+                
                 return hasChanged ? newTasks : currentTasks;
             });
         }
-    }, [tasks]);
+    }, [tasks, addLog]);
+    
+    useEffect(() => {
+        // This effect declaratively syncs agent status based on the current state of tasks.
+        const activeTasksByAgent: Record<AgentName, Task[]> = AGENT_NAMES.reduce(
+            (acc, name) => ({ ...acc, [name]: [] }),
+            {} as Record<AgentName, Task[]>
+        );
+        
+        // An "active" task is one an agent is currently supposed to be working on.
+        // This includes tasks in progress that haven't hit 100% simulated work yet.
+        tasks.forEach(task => {
+            if (task.status === TaskStatus.IN_PROGRESS && (task.progress ?? 0) < 100) {
+                 activeTasksByAgent[task.assignedTo].push(task);
+            }
+        });
 
+        const newAgentStatus = { ...agentStatus };
+        const newAgentWork = { ...agentWork };
+        let statusHasChanged = false;
+        let workHasChanged = false;
 
-    const addLog = useCallback((agent: AgentName, message: string) => {
-        setLogs(prev => [...prev, { agent, message, timestamp: new Date() }]);
-    }, []);
+        AGENT_NAMES.forEach(agentName => {
+            if (agentName === AgentName.MASTER_PLANNER) return; // Master Planner is handled separately.
+
+            const activeTasks = activeTasksByAgent[agentName];
+            const isWorking = activeTasks.length > 0;
+            const currentStatus = agentStatus[agentName];
+
+            if (isWorking) {
+                // If agent is not working (and not in an error state), set to working.
+                if (currentStatus !== AgentStatus.WORKING && currentStatus !== AgentStatus.ERROR) {
+                    newAgentStatus[agentName] = AgentStatus.WORKING;
+                    statusHasChanged = true;
+                }
+                // Update work to the first active task.
+                const newWork = activeTasks[0].title;
+                if (agentWork[agentName] !== newWork) {
+                    newAgentWork[agentName] = newWork;
+                    workHasChanged = true;
+                }
+            } else { // Agent has no active tasks.
+                // If agent was working, set to idle.
+                if (currentStatus === AgentStatus.WORKING) {
+                    newAgentStatus[agentName] = AgentStatus.IDLE;
+                    statusHasChanged = true;
+                }
+                // Clear work when idle.
+                if (agentWork[agentName] !== null) {
+                    newAgentWork[agentName] = null;
+                    workHasChanged = true;
+                }
+            }
+        });
+        
+        // Batch updates to avoid multiple re-renders.
+        if (statusHasChanged) {
+            setAgentStatus(newAgentStatus);
+        }
+        if (workHasChanged) {
+            setAgentWork(newAgentWork);
+        }
+    // agentStatus and agentWork are included to ensure we're comparing against the latest state.
+    }, [tasks, agentStatus, agentWork]);
+
 
     const handleReset = useCallback(() => {
         setTasks([]);
@@ -194,62 +283,73 @@ const App: React.FC = () => {
     }, [addLog, handleReset]);
 
     const processTask = useCallback(async (task: Task) => {
-        if (processingTasks.current.has(task.id) || task.parentId) return; // Do not process sub-tasks directly, they are manual
+        // Parent tasks (tasks that have sub-tasks) are non-executable containers.
+        // Their status is derived from their sub-tasks.
+        const isParentTask = tasks.some(subTask => subTask.parentId === task.id);
+        if (isParentTask) {
+            return; // Skip processing for parent tasks.
+        }
+
+        // A task without sub-tasks is treated as a normal, executable task.
+        // Don't re-process a task that's already in the processing queue.
+        if (processingTasks.current.has(task.id)) return;
         
         processingTasks.current.add(task.id);
-        setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.WORKING}));
-        setAgentWork(prev => ({...prev, [task.assignedTo]: task.title}));
         addLog(task.assignedTo, `Starting task: "${task.title}"`);
         
         const isContentGenerationTask = task.assignedTo === AgentName.SPONSORSHIP_OUTREACH || task.assignedTo === AgentName.MARKETING;
 
         if (isContentGenerationTask) {
-             try {
+            try {
                 addLog(task.assignedTo, `Generating content for "${task.title}"...`);
                 const content = await executeTask(task);
-                setApprovals(prev => [...prev, {
-                    id: `approval-${task.id}`,
-                    taskId: task.id,
-                    agent: task.assignedTo,
-                    title: `Approval for: ${task.title}`,
-                    content: content,
-                    status: 'pending'
-                }]);
-                addLog(task.assignedTo, `Task "${task.title}" requires approval.`);
-                setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: TaskStatus.AWAITING_APPROVAL, progress: 100, customPrompt: undefined} : t));
 
-             } catch(e) {
+                // Use the setTasks updater to atomically check the task's current state
+                // before creating an approval, preventing a race condition if the user
+                // manually completes the task while content is being generated.
+                setTasks(prev => {
+                    const taskInState = prev.find(t => t.id === task.id);
+
+                    if (taskInState && taskInState.status === TaskStatus.IN_PROGRESS) {
+                        // Task is still active, proceed with the approval flow.
+                        setApprovals(prevApprovals => [...prevApprovals, {
+                            id: `approval-${task.id}`,
+                            taskId: task.id,
+                            agent: task.assignedTo,
+                            title: `Approval for: ${taskInState.title}`,
+                            content: content,
+                            status: 'pending'
+                        }]);
+                        addLog(task.assignedTo, `Task "${taskInState.title}" requires approval.`);
+                        return prev.map(t => t.id === task.id ? {...t, status: TaskStatus.AWAITING_APPROVAL, progress: 100, customPrompt: undefined} : t);
+                    } else {
+                        // Task was manually completed. Discard the result.
+                        addLog(AgentName.MASTER_PLANNER, `Discarding generated content for "${task.title}" as it was manually completed.`);
+                        return prev;
+                    }
+                });
+
+            } catch(e) {
                 const currentRetries = task.retries || 0;
                 const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
 
                 if (currentRetries < MAX_TASK_RETRIES) {
                      addLog(task.assignedTo, `Error on task "${task.title}": ${errorMessage}. Retrying (${currentRetries + 1}/${MAX_TASK_RETRIES}).`);
                      setTasks(prev => prev.map(t => t.id === task.id ? {...t, retries: currentRetries + 1, progress: 0} : t));
-                     setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.IDLE}));
-                     setAgentWork(prev => ({...prev, [task.assignedTo]: null}));
                 } else {
                     addLog(task.assignedTo, `Error on task "${task.title}": ${errorMessage}. Task failed after ${MAX_TASK_RETRIES} retries.`);
                     setTasks(prev => prev.map(t => t.id === task.id ? {...t, status: TaskStatus.FAILED, progress: 0} : t));
                     setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.ERROR}));
                     setAgentWork(prev => ({...prev, [task.assignedTo]: null}));
                 }
-             } finally {
+            } finally {
                 processingTasks.current.delete(task.id);
-             }
+            }
         } else { // Simulation for non-content tasks like logistics
             const processingTime = 2000 + Math.random() * 3000;
             const updateInterval = 100;
             const progressSteps = processingTime / updateInterval;
             let progressIncrement = 100 / progressSteps;
-            
-            // Do not simulate progress for parent tasks; their progress is derived from sub-tasks
-            const subTasks = tasks.filter(t => t.parentId === task.id);
-            if (subTasks.length > 0) {
-                 addLog(task.assignedTo, `Task "${task.title}" is a parent task. Its progress will be determined by its sub-tasks.`);
-                 processingTasks.current.delete(task.id);
-                 return;
-            }
-
 
             if (progressIntervals.current[task.id]) {
                 clearInterval(progressIntervals.current[task.id]);
@@ -271,8 +371,6 @@ const App: React.FC = () => {
                 
                 setTasks(prev => prev.map(t => t.id === task.id ? {...t, progress: 100} : t));
                 addLog(task.assignedTo, `Task "${task.title}" work is finished. Awaiting manual completion.`);
-                setAgentStatus(prev => ({...prev, [task.assignedTo]: AgentStatus.IDLE}));
-                setAgentWork(prev => ({...prev, [task.assignedTo]: null}));
                 processingTasks.current.delete(task.id);
             }, processingTime);
         }
@@ -320,8 +418,6 @@ const App: React.FC = () => {
 
         if (relatedTask) {
             addLog(AgentName.MASTER_PLANNER, `Decision received for "${relatedTask.title}": ${decision.toUpperCase()}`);
-            setAgentStatus(prev => ({...prev, [relatedTask.assignedTo]: AgentStatus.IDLE}));
-            setAgentWork(prev => ({...prev, [relatedTask.assignedTo]: null}));
 
             if (decision === 'approved') {
                 setTasks(prev => prev.map(t => t.id === approval.taskId ? {
@@ -362,12 +458,8 @@ const App: React.FC = () => {
         const taskToReassign = tasks.find(t => t.id === taskId);
         if (!taskToReassign) return;
         
-        const oldAgent = taskToReassign.assignedTo;
-        
         addLog(newAgent, `Task "${taskToReassign.title}" has been reassigned to me. Resetting and starting work.`);
         
-        setAgentStatus(prev => ({...prev, [oldAgent]: AgentStatus.IDLE}));
-
         setTasks(prev => prev.map(t => 
             t.id === taskId 
             ? { ...t, assignedTo: newAgent, status: TaskStatus.IN_PROGRESS, progress: 0, retries: 0 } 
