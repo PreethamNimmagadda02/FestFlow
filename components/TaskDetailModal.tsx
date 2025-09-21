@@ -119,6 +119,30 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
         return descendants;
     }, [task.id, allTasks]);
 
+    const allPrerequisites = useMemo(() => {
+        const taskMap = new Map(allTasks.map(t => [t.id, t]));
+        const prerequisites = new Map<string, Task>();
+        const queue = [...(task.dependsOn || [])];
+        const visited = new Set(queue);
+
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            const depTask = taskMap.get(currentId);
+            if (depTask) {
+                prerequisites.set(currentId, depTask);
+                if (depTask.dependsOn) {
+                    for (const nextDepId of depTask.dependsOn) {
+                        if (!visited.has(nextDepId)) {
+                            visited.add(nextDepId);
+                            queue.push(nextDepId);
+                        }
+                    }
+                }
+            }
+        }
+        return Array.from(prerequisites.values());
+    }, [task.dependsOn, allTasks]);
+
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             const file = event.target.files[0];
@@ -218,7 +242,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
 
                     {isEditing ? (
                         <div>
-                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Dependencies</h4>
+                            <h4 className="text-sm font-semibold text-text-secondary mb-2">Prerequisites</h4>
                             <div className="space-y-2 bg-primary p-3 rounded-lg border border-accent max-h-48 overflow-y-auto">
                                 {allTasks
                                     .filter(t => t.id !== task.id && !taskDescendants.has(t.id))
@@ -239,20 +263,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
                                         )
                                     })}
                                     {allTasks.filter(t => t.id !== task.id && !taskDescendants.has(t.id)).length === 0 && (
-                                        <p className="text-text-secondary text-center text-xs py-2">No available tasks to set as dependencies.</p>
+                                        <p className="text-text-secondary text-center text-xs py-2">No available tasks to set as prerequisites.</p>
                                     )}
                             </div>
                         </div>
                     ) : (
-                        task.dependsOn && task.dependsOn.length > 0 && (
+                        allPrerequisites.length > 0 && (
                             <div>
-                                <h4 className="text-sm font-semibold text-text-secondary mb-2">Dependencies</h4>
-                                <ul className="space-y-2 bg-primary p-3 rounded-lg border border-accent">
-                                    {task.dependsOn.map(depId => {
-                                        const depTask = allTasks.find(t => t.id === depId);
+                                <h4 className="text-sm font-semibold text-text-secondary mb-2">Prerequisites</h4>
+                                <ul className="space-y-2 bg-primary p-3 rounded-lg border border-accent max-h-48 overflow-y-auto">
+                                    {allPrerequisites.map(depTask => {
                                         const isCompleted = depTask?.status === TaskStatus.COMPLETED;
                                         return (
-                                            <li key={depId} className={`flex items-center text-sm ${isCompleted ? 'text-light' : 'text-text-secondary'}`}>
+                                            <li key={depTask.id} className={`flex items-center text-sm ${isCompleted ? 'text-text-secondary' : 'text-light'}`}>
                                                 {isCompleted ? 
                                                     <CheckCircleIcon className="w-4 h-4 mr-2 text-success flex-shrink-0" /> : 
                                                     <ClockIcon className="w-4 h-4 mr-2 text-yellow-300 flex-shrink-0" />
@@ -275,7 +298,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
                                 {subTasks.map(subTask => {
                                     const isCompleted = subTask?.status === TaskStatus.COMPLETED;
                                     return (
-                                        <li key={subTask.id} className={`flex items-center text-sm ${isCompleted ? 'text-light' : 'text-text-secondary'}`}>
+                                        <li key={subTask.id} className={`flex items-center text-sm ${isCompleted ? 'text-text-secondary' : 'text-light'}`}>
                                              {isCompleted ? 
                                                 <CheckCircleIcon className="w-4 h-4 mr-2 text-success flex-shrink-0" /> : 
                                                 <ClockIcon className="w-4 h-4 mr-2 text-yellow-300 flex-shrink-0" />
