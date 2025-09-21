@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Task, TaskStatus } from '../types';
 import { AGENT_DETAILS } from '../constants';
 import { UndoIcon } from './icons/UndoIcon';
@@ -170,6 +171,16 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
     return finalGanttTasks;
 };
 
+interface TooltipData {
+    content: {
+        prerequisites: string[];
+        startDay: number;
+        endDay: number;
+        duration: number;
+    };
+    targetRect: DOMRect;
+}
+
 
 export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTaskUpdate, isEditing, setIsEditing, onSaveChanges }) => {
     const [orderedTasks, setOrderedTasks] = useState<Task[]>([]);
@@ -180,20 +191,11 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     const ganttGridRef = useRef<HTMLDivElement>(null);
     const sidebarRef = useRef<HTMLDivElement>(null);
     const [dragOffsetX, setDragOffsetX] = useState(0);
-    const [tooltip, setTooltip] = useState<{
-        content: {
-            prerequisites: string[];
-            startDay: number;
-            endDay: number;
-            duration: number;
-        };
-        position: {
-            top: number;
-            bottom: number;
-            left: number;
-            width: number;
-        }
-    } | null>(null);
+
+    // Tooltip related state and refs
+    const tooltipRef = useRef<HTMLDivElement>(null);
+    const [tooltipData, setTooltipData] = useState<TooltipData | null>(null);
+    const [tooltipPosition, setTooltipPosition] = useState<React.CSSProperties>({ visibility: 'hidden', opacity: 0 });
 
     useEffect(() => {
         setOrderedTasks(tasks);
@@ -235,7 +237,65 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     }, [chartStartDate, totalDays]);
 
     const ganttTasksMap = useMemo(() => new Map(ganttTasks.map(gt => [gt.id, gt])), [ganttTasks]);
+
+    useLayoutEffect(() => {
+        if (!tooltipData || !tooltipRef.current) {
+            setTooltipPosition({ visibility: 'hidden', opacity: 0 });
+            return;
+        }
     
+        const tooltipEl = tooltipRef.current;
+        const taskRect = tooltipData.targetRect;
+        const tooltipRect = tooltipEl.getBoundingClientRect();
+    
+        if (tooltipRect.width === 0 || tooltipRect.height === 0) {
+            return;
+        }
+    
+        const vpWidth = window.innerWidth;
+        const vpHeight = window.innerHeight;
+        const OFFSET = 15; // Increased offset for more spacing
+    
+        // Default to position above the task
+        let top = taskRect.top - tooltipRect.height - OFFSET;
+    
+        // If it goes off-screen at the top, flip it to be below the task
+        if (top < OFFSET) {
+            top = taskRect.bottom + OFFSET;
+        }
+    
+        // Center horizontally relative to the task
+        let left = taskRect.left + (taskRect.width / 2) - (tooltipRect.width / 2);
+    
+        // Adjust horizontal position to keep it inside the viewport
+        if (left < OFFSET) {
+            left = OFFSET;
+        }
+        if (left + tooltipRect.width > vpWidth - OFFSET) {
+            left = vpWidth - tooltipRect.width - OFFSET;
+        }
+    
+        // Final check: if it's *still* off-screen vertically (e.g., small screens), center it.
+        if (top < OFFSET || top + tooltipRect.height > vpHeight - OFFSET) {
+            setTooltipPosition({
+                position: 'fixed',
+                top: `50%`,
+                left: `50%`,
+                transform: 'translate(-50%, -50%)',
+                visibility: 'visible',
+                opacity: 1,
+            });
+        } else {
+            setTooltipPosition({
+                position: 'fixed',
+                top: `${top}px`,
+                left: `${left}px`,
+                visibility: 'visible',
+                opacity: 1,
+            });
+        }
+    }, [tooltipData]);
+
     const updateTasksAndStoreHistory = (updateFn: (currentTasks: Task[]) => Task[]) => {
         setOrderedTasks(currentTasks => {
             setHistory(prevHistory => [...prevHistory, currentTasks]);
@@ -484,31 +544,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         return allPrereqIds;
     }, [isEditing, hoveredTaskId, orderedTasks]);
 
-    const tooltipStyle = useMemo((): React.CSSProperties | null => {
-        if (!isEditing || !tooltip) return null;
-    
-        const TOOLTIP_ESTIMATED_HEIGHT = 220;
-        const spaceAbove = tooltip.position.top;
-        const spaceBelow = window.innerHeight - tooltip.position.bottom;
-        
-        const placeAbove = spaceAbove >= TOOLTIP_ESTIMATED_HEIGHT || spaceAbove > spaceBelow;
-        
-        const style: React.CSSProperties = {
-            left: `${tooltip.position.left + tooltip.position.width / 2}px`,
-            transform: 'translateX(-50%)',
-            animationDuration: '0.2s',
-        };
-        
-        if (placeAbove) {
-            style.bottom = `${window.innerHeight - tooltip.position.top + 8}px`;
-        } else {
-            style.top = `${tooltip.position.bottom + 8}px`;
-        }
-    
-        return style;
-    }, [isEditing, tooltip]);
-
-
     if (tasks.length === 0) {
         return (
             <div className="bg-secondary p-6 rounded-xl border border-accent text-center text-text-secondary h-64 flex items-center justify-center">
@@ -516,6 +551,47 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             </div>
         );
     }
+    
+    const tooltipPortal = isEditing ? createPortal(
+        <div
+            ref={tooltipRef}
+            className="fixed z-50 p-4 bg-primary rounded-xl border border-accent shadow-2xl w-64 pointer-events-none transition-opacity duration-200"
+            style={tooltipPosition}
+        >
+            {tooltipData?.content && (
+                <div className="space-y-3">
+                    <div>
+                        <h5 className="text-sm font-bold text-highlight mb-2">Schedule</h5>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                                <span className="text-xs text-text-secondary">Start</span>
+                                <p className="font-bold text-light">Day {tooltipData.content.startDay}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-text-secondary">End</span>
+                                <p className="font-bold text-light">Day {tooltipData.content.endDay}</p>
+                            </div>
+                            <div>
+                                <span className="text-xs text-text-secondary">Duration</span>
+                                <p className="font-bold text-light">{tooltipData.content.duration}d</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="border-t border-accent pt-2">
+                        <h5 className="text-sm font-bold text-highlight mb-1">All Prerequisites</h5>
+                        {tooltipData.content.prerequisites.length > 0 ? (
+                            <ul className="list-disc list-inside text-sm text-light space-y-1 max-h-24 overflow-y-auto">
+                                {tooltipData.content.prerequisites.map((name, i) => <li key={i} className="truncate">{name}</li>)}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-text-secondary">None</p>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>,
+        document.getElementById('tooltip-root')!
+    ) : null;
     
     return (
         <div className="bg-secondary rounded-xl border border-accent overflow-hidden shadow-2xl">
@@ -625,21 +701,22 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                             onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                             onMouseEnter={(e) => {
                                                 if (isEditing) {
-                                                    const taskElement = e.currentTarget as HTMLDivElement;
-                                                    const rect = taskElement.getBoundingClientRect();
                                                     setHoveredTaskId(ganttTask.id);
-                                                    const allPrerequisites = getAllPrerequisites(ganttTask.id, orderedTasks);
-                                                    
-                                                    setTooltip({
-                                                        content: { prerequisites: allPrerequisites, startDay, endDay, duration: durationDays },
-                                                        position: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width }
+                                                    setTooltipData({
+                                                        content: {
+                                                            prerequisites: getAllPrerequisites(ganttTask.id, orderedTasks),
+                                                            startDay,
+                                                            endDay,
+                                                            duration: durationDays,
+                                                        },
+                                                        targetRect: (e.currentTarget as HTMLElement).getBoundingClientRect(),
                                                     });
                                                 }
                                             }}
                                             onMouseLeave={() => {
                                                 if (isEditing) {
                                                     setHoveredTaskId(null);
-                                                    setTooltip(null);
+                                                    setTooltipData(null);
                                                 }
                                             }}
                                             onClick={() => !isEditing && onTaskClick(ganttTask)}
@@ -659,42 +736,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                     </div>
                 </div>
             </div>
-            {isEditing && tooltip && tooltipStyle && (
-                <div
-                    className="fixed z-50 p-4 bg-primary rounded-xl border border-accent shadow-2xl w-64 pointer-events-none transition-opacity duration-200 animate-fadeIn"
-                    style={tooltipStyle}
-                >
-                     <div className="space-y-3">
-                        <div>
-                            <h5 className="text-sm font-bold text-highlight mb-2">Schedule</h5>
-                            <div className="grid grid-cols-3 gap-2 text-center">
-                                <div>
-                                    <span className="text-xs text-text-secondary">Start</span>
-                                    <p className="font-bold text-light">Day {tooltip.content.startDay}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-text-secondary">End</span>
-                                    <p className="font-bold text-light">Day {tooltip.content.endDay}</p>
-                                </div>
-                                <div>
-                                    <span className="text-xs text-text-secondary">Duration</span>
-                                    <p className="font-bold text-light">{tooltip.content.duration}d</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="border-t border-accent pt-2">
-                            <h5 className="text-sm font-bold text-highlight mb-1">All Prerequisites</h5>
-                            {tooltip.content.prerequisites.length > 0 ? (
-                                <ul className="list-disc list-inside text-sm text-light space-y-1 max-h-24 overflow-y-auto">
-                                    {tooltip.content.prerequisites.map((name, i) => <li key={i} className="truncate">{name}</li>)}
-                                </ul>
-                            ) : (
-                                <p className="text-sm text-text-secondary">None</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {tooltipPortal}
         </div>
     );
 };
