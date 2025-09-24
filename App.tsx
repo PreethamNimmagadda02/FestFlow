@@ -7,7 +7,7 @@ import { LoadSessionModal } from './components/LoadSessionModal';
 import { AgentName, Task, Approval, ActivityLog, AgentStatus, TaskStatus, AppState, SavedSession } from './types';
 import { AGENT_NAMES, MAX_TASK_RETRIES } from './constants';
 import { decomposeGoal, executeTask } from './services/geminiService';
-import { createSession, updateSession, getSavedSessions, loadSessionFromFirestore, deleteSession } from './services/firestoreService';
+import { createSession, updateSession, getSavedSessions, loadSessionFromFirestore, deleteSession, updateSessionName } from './services/firestoreService';
 import { useAuth } from './context/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
 import { FullScreenLoader } from './components/FullScreenLoader';
@@ -122,7 +122,7 @@ const App: React.FC = () => {
 
     // Auto-save effect
     useEffect(() => {
-        if (!isStarted || !currentUser || !currentSessionId) {
+        if (!isStarted || !currentUser || !currentUser.email || !currentSessionId) {
             return;
         }
 
@@ -134,7 +134,7 @@ const App: React.FC = () => {
         debounceTimer.current = setTimeout(async () => {
             try {
                 const currentState: AppState = { tasks, approvals, logs, agentStatus, agentWork, isStarted };
-                await updateSession(currentUser.uid, currentSessionId, currentState);
+                await updateSession(currentUser.email!, currentSessionId, currentState);
                 setSaveStatus('saved');
             } catch (error) {
                 console.error("Auto-save failed:", error);
@@ -415,7 +415,7 @@ const App: React.FC = () => {
     }, [currentUser, isStarted, handleReset]);
 
     const handleGoalSubmit = useCallback(async (goal: string) => {
-        if (!currentUser) {
+        if (!currentUser || !currentUser.email) {
             setError("Authentication error: You must be logged in to create a plan.");
             return;
         }
@@ -441,7 +441,7 @@ const App: React.FC = () => {
                 isStarted: true,
             };
 
-            const newSessionId = await createSession(currentUser.uid, initialState);
+            const newSessionId = await createSession(currentUser.email, initialState, goal);
             
             setTasks(initialState.tasks);
             setApprovals(initialState.approvals);
@@ -586,7 +586,7 @@ const App: React.FC = () => {
     }, [addLog]);
 
     const handleOpenLoadModal = useCallback(async () => {
-        if (!currentUser) {
+        if (!currentUser || !currentUser.email) {
             setError("You must be logged in to load sessions.");
             return;
         }
@@ -594,7 +594,7 @@ const App: React.FC = () => {
         setIsLoadingSessions(true);
         setLoadSessionsError(null);
         try {
-            const sessions = await getSavedSessions(currentUser.uid);
+            const sessions = await getSavedSessions(currentUser.email);
             setSavedSessions(sessions);
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -605,7 +605,7 @@ const App: React.FC = () => {
     }, [currentUser]);
 
     const handleLoadState = useCallback(async (sessionId: string) => {
-        if (!currentUser) {
+        if (!currentUser || !currentUser.email) {
             setError('Authentication error: No user is logged in.');
             return;
         }
@@ -613,7 +613,7 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const loadedState = await loadSessionFromFirestore(currentUser.uid, sessionId);
+            const loadedState = await loadSessionFromFirestore(currentUser.email, sessionId);
             
             handleReset();
             
@@ -635,6 +635,20 @@ const App: React.FC = () => {
             setIsLoading(false);
         }
     }, [handleReset, addLog, currentUser]);
+    
+    const handleUpdateSessionName = async (sessionId: string, newName: string) => {
+        if (!currentUser || !currentUser.email) return;
+        setLoadSessionsError(null);
+        try {
+            await updateSessionName(currentUser.email, sessionId, newName);
+            setSavedSessions(currentSessions =>
+                currentSessions.map(s => s.id === sessionId ? { ...s, name: newName } : s)
+            );
+        } catch (error) {
+            console.error("Failed to update session name:", error);
+            setLoadSessionsError("Failed to update session name.");
+        }
+    };
 
     const handleConfirmReset = () => {
         handleReset();
@@ -642,9 +656,9 @@ const App: React.FC = () => {
     };
     
     const handleDeleteCurrentSession = useCallback(async () => {
-        if (currentUser && currentSessionId) {
+        if (currentUser && currentUser.email && currentSessionId) {
             try {
-                await deleteSession(currentUser.uid, currentSessionId);
+                await deleteSession(currentUser.email, currentSessionId);
                 addLog(AgentName.MASTER_PLANNER, `Deleted current session ${currentSessionId.slice(0,6)}...`);
                 handleReset();
             } catch (error) {
@@ -656,7 +670,7 @@ const App: React.FC = () => {
     }, [currentUser, currentSessionId, addLog, handleReset]);
 
     const handleDeleteSession = useCallback(async (sessionId: string) => {
-        if (!currentUser) {
+        if (!currentUser || !currentUser.email) {
             setLoadSessionsError("You must be logged in to delete sessions.");
             return;
         }
@@ -674,11 +688,11 @@ const App: React.FC = () => {
         setLoadSessionsError(null);
     
         try {
-            await deleteSession(currentUser.uid, sessionId);
+            await deleteSession(currentUser.email, sessionId);
             addLog(AgentName.MASTER_PLANNER, `Deleted session ${sessionId.slice(0,6)}...`);
             
             // Re-fetch the list from the database to ensure the UI is in sync.
-            const freshSessions = await getSavedSessions(currentUser.uid);
+            const freshSessions = await getSavedSessions(currentUser.email);
             setSavedSessions(freshSessions);
     
         } catch (e) {
@@ -686,7 +700,7 @@ const App: React.FC = () => {
             setLoadSessionsError(`Failed to delete session: ${errorMessage}`);
             try {
                 // Attempt to re-fetch even on error to ensure consistency
-                const sessions = await getSavedSessions(currentUser.uid);
+                const sessions = await getSavedSessions(currentUser.email);
                 setSavedSessions(sessions);
             } catch (fetchError) {
                  console.error("Failed to re-fetch sessions after deletion error:", fetchError);
@@ -746,6 +760,7 @@ const App: React.FC = () => {
                     sessions={savedSessions}
                     onLoadSession={handleLoadState}
                     onDeleteSession={handleDeleteSession}
+                    onUpdateSessionName={handleUpdateSessionName}
                     isLoading={isLoadingSessions}
                     error={loadSessionsError}
                 />
