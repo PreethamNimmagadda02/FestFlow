@@ -4,6 +4,7 @@ import { auth } from '../services/firebase';
 
 export interface AuthUser {
     uid: string;
+    email: string | null;
     displayName: string | null;
     photoURL: string | null;
 }
@@ -26,6 +27,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (user) {
                 setCurrentUser({
                     uid: user.uid,
+                    email: user.email,
                     displayName: user.displayName,
                     photoURL: user.photoURL,
                 });
