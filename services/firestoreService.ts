@@ -10,10 +10,14 @@ import {
   Timestamp,
   setDoc,
   deleteDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { AppState, SavedSession } from '../types';
 
+// Note: This service uses the user's email as the document ID for their data collection.
+// This assumes user emails are unique and do not change. Using the immutable Firebase UID
+// is often a more robust approach for user data scoping.
 const USERS_COLLECTION = 'users';
 const SESSIONS_COLLECTION = 'sessions';
 
@@ -44,19 +48,21 @@ const removeUndefinedValues = (obj: any): any => {
 
 /**
  * Creates a new session document in Firestore for a user.
- * @param userId The UID of the authenticated user.
+ * @param userEmail The email of the authenticated user.
  * @param state The initial state of the application to save.
+ * @param goal The user's event goal, used as the initial session name.
  * @returns The ID of the newly created session document.
  */
-export const createSession = async (userId: string, state: AppState): Promise<string> => {
-    if (!userId) throw new Error("User is not authenticated.");
+export const createSession = async (userEmail: string, state: AppState, goal: string): Promise<string> => {
+    if (!userEmail) throw new Error("User is not authenticated or email is missing.");
     try {
         const sanitizedState = removeUndefinedValues(state);
-        const userSessionsCollection = collection(db, USERS_COLLECTION, userId, SESSIONS_COLLECTION);
+        const userSessionsCollection = collection(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION);
         const docRef = await addDoc(userSessionsCollection, {
+            name: goal, // Use the goal as the initial name
             ...sanitizedState,
             timestamp: serverTimestamp(),
-            ownerId: userId,
+            ownerId: userEmail,
         });
         return docRef.id;
     } catch (e) {
@@ -67,18 +73,16 @@ export const createSession = async (userId: string, state: AppState): Promise<st
 
 /**
  * Updates an existing session document in Firestore.
- * @param userId The UID of the authenticated user.
+ * @param userEmail The email of the authenticated user.
  * @param sessionId The ID of the session document to update.
  * @param state The current application state to save.
  */
-export const updateSession = async (userId: string, sessionId: string, state: AppState): Promise<void> => {
-    if (!userId) throw new Error("User is not authenticated.");
+export const updateSession = async (userEmail: string, sessionId: string, state: AppState): Promise<void> => {
+    if (!userEmail) throw new Error("User is not authenticated or email is missing.");
     if (!sessionId) throw new Error("No session is currently active.");
     try {
         const sanitizedState = removeUndefinedValues(state);
-        const sessionDocRef = doc(db, USERS_COLLECTION, userId, SESSIONS_COLLECTION, sessionId);
-        // Using setDoc with merge: true is safer as it won't overwrite fields that
-        // might be handled server-side (like a server timestamp on creation).
+        const sessionDocRef = doc(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION, sessionId);
         await setDoc(sessionDocRef, {
             ...sanitizedState,
             lastUpdated: serverTimestamp(),
@@ -92,19 +96,38 @@ export const updateSession = async (userId: string, sessionId: string, state: Ap
     }
 };
 
+/**
+ * Updates the name of a specific session document.
+ * @param userEmail The email of the authenticated user.
+ * @param sessionId The ID of the session to update.
+ * @param newName The new name for the session.
+ */
+export const updateSessionName = async (userEmail: string, sessionId: string, newName: string): Promise<void> => {
+    if (!userEmail) throw new Error("User is not authenticated or email is missing.");
+    if (!sessionId) throw new Error("Session ID is required.");
+    if (!newName.trim()) throw new Error("Session name cannot be empty.");
 
-export const getSavedSessions = async (userId: string): Promise<SavedSession[]> => {
-  if (!userId) throw new Error("User is not authenticated.");
+    const sessionDocRef = doc(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION, sessionId);
+    await updateDoc(sessionDocRef, {
+        name: newName.trim()
+    });
+};
+
+
+export const getSavedSessions = async (userEmail: string): Promise<SavedSession[]> => {
+  if (!userEmail) throw new Error("User is not authenticated or email is missing.");
   try {
-    const sessionsCollectionRef = collection(db, USERS_COLLECTION, userId, SESSIONS_COLLECTION);
+    const sessionsCollectionRef = collection(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION);
     const q = query(sessionsCollectionRef, orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);
     const sessions: SavedSession[] = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
+      const timestamp = (data.timestamp as Timestamp)?.toDate() || new Date();
       sessions.push({
         id: doc.id,
-        timestamp: (data.timestamp as Timestamp)?.toDate() || new Date(),
+        name: data.name || `Plan from ${timestamp.toLocaleString()}`,
+        timestamp: timestamp,
         taskCount: data.tasks?.length || 0,
       });
     });
@@ -118,10 +141,10 @@ export const getSavedSessions = async (userId: string): Promise<SavedSession[]> 
   }
 };
 
-export const loadSessionFromFirestore = async (userId: string, sessionId: string): Promise<AppState> => {
-  if (!userId) throw new Error("User is not authenticated.");
+export const loadSessionFromFirestore = async (userEmail: string, sessionId: string): Promise<AppState> => {
+  if (!userEmail) throw new Error("User is not authenticated or email is missing.");
   try {
-    const docRef = doc(db, USERS_COLLECTION, userId, SESSIONS_COLLECTION, sessionId);
+    const docRef = doc(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION, sessionId);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data();
@@ -150,14 +173,14 @@ export const loadSessionFromFirestore = async (userId: string, sessionId: string
 
 /**
  * Deletes a specific session document from Firestore for a user.
- * @param userId The UID of the authenticated user.
+ * @param userEmail The email of the authenticated user.
  * @param sessionId The ID of the session document to delete.
  */
-export const deleteSession = async (userId: string, sessionId: string): Promise<void> => {
-    if (!userId) throw new Error("User is not authenticated.");
+export const deleteSession = async (userEmail: string, sessionId: string): Promise<void> => {
+    if (!userEmail) throw new Error("User is not authenticated or email is missing.");
     if (!sessionId) throw new Error("Session ID is required to delete.");
     try {
-        const sessionDocRef = doc(db, USERS_COLLECTION, userId, SESSIONS_COLLECTION, sessionId);
+        const sessionDocRef = doc(db, USERS_COLLECTION, userEmail, SESSIONS_COLLECTION, sessionId);
         await deleteDoc(sessionDocRef);
     } catch (e) {
         console.error(`Error deleting document (${sessionId}): `, e);
