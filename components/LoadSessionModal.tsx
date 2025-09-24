@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SavedSession } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
 import { ConfirmationModal } from './ConfirmationModal';
+import { PencilIcon } from './icons/PencilIcon';
 
 interface LoadSessionModalProps {
     isOpen: boolean;
@@ -9,30 +10,53 @@ interface LoadSessionModalProps {
     sessions: SavedSession[];
     onLoadSession: (sessionId: string) => void;
     onDeleteSession: (sessionId: string) => Promise<void>;
+    onUpdateSessionName: (sessionId: string, newName: string) => Promise<void>;
     isLoading: boolean;
     error: string | null;
 }
 
-export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onClose, sessions, onLoadSession, onDeleteSession, isLoading, error }) => {
+export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onClose, sessions, onLoadSession, onDeleteSession, onUpdateSessionName, isLoading, error }) => {
     if (!isOpen) return null;
 
     const [sessionToDelete, setSessionToDelete] = useState<SavedSession | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editingSessionId && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [editingSessionId]);
 
     const handleConfirmDelete = async () => {
         if (!sessionToDelete) return;
         setIsDeleting(true);
         try {
             await onDeleteSession(sessionToDelete.id);
-            setSessionToDelete(null); // Close modal on success
+            setSessionToDelete(null);
         } catch (err) {
             console.error("Deletion failed:", err);
-            // Error is already displayed via the 'error' prop, so no need for another state here.
         } finally {
             setIsDeleting(false);
         }
     };
-
+    
+    const handleEditClick = (session: SavedSession) => {
+        setEditingSessionId(session.id);
+        setEditingName(session.name);
+    };
+    
+    const handleSaveName = async () => {
+        if (!editingSessionId) return;
+        const originalSession = sessions.find(s => s.id === editingSessionId);
+        if (originalSession && editingName.trim() && editingName !== originalSession.name) {
+            await onUpdateSessionName(editingSessionId, editingName);
+        }
+        setEditingSessionId(null);
+    };
 
     return (
         <>
@@ -41,12 +65,12 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
                 onClick={onClose}
             >
                 <div 
-                    className="bg-secondary rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
+                    className="bg-secondary rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
                     onClick={e => e.stopPropagation()}
                     style={{animationDuration: '0.3s'}}
                 >
                     <div className="p-4 border-b border-accent flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-highlight">Load Session</h3>
+                        <h3 className="text-lg font-bold text-highlight">Load Plan</h3>
                         <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
                     </div>
 
@@ -61,18 +85,38 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
                         ) : error ? (
                             <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg">{error}</div>
                         ) : sessions.length === 0 ? (
-                            <p className="text-text-secondary text-center py-10">No saved sessions found in the cloud.</p>
+                            <p className="text-text-secondary text-center py-10">No saved plans found in the cloud.</p>
                         ) : (
                             <ul className="space-y-3">
                                 {sessions.map(session => (
                                     <li key={session.id} className="bg-primary p-3 rounded-lg border border-accent flex justify-between items-center transition-colors hover:bg-accent/30 group">
-                                        <div>
-                                            <p className="font-mono text-sm text-light">{session.id}</p>
-                                            <p className="text-xs text-text-secondary">
+                                        <div className="flex-grow min-w-0">
+                                            {editingSessionId === session.id ? (
+                                                <input
+                                                    ref={inputRef}
+                                                    type="text"
+                                                    value={editingName}
+                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                    onBlur={handleSaveName}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleSaveName();
+                                                        if (e.key === 'Escape') setEditingSessionId(null);
+                                                    }}
+                                                    className="w-full bg-accent p-1 rounded-md text-light focus:outline-none focus:ring-2 focus:ring-highlight"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center space-x-2">
+                                                    <p className="font-semibold text-base text-light truncate" title={session.name}>{session.name}</p>
+                                                    <button onClick={() => handleEditClick(session)} className="opacity-0 group-hover:opacity-100 text-text-secondary hover:text-white transition-opacity p-1">
+                                                        <PencilIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-text-secondary mt-1">
                                                 Saved on: {session.timestamp.toLocaleString()} ({session.taskCount} tasks)
                                             </p>
                                         </div>
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
                                             <button 
                                                 onClick={() => onLoadSession(session.id)}
                                                 className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity text-sm font-semibold"
@@ -82,7 +126,7 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
                                             <button
                                                 onClick={() => setSessionToDelete(session)}
                                                 className="p-2 rounded-lg text-text-secondary hover:bg-danger hover:text-white transition-colors"
-                                                title="Delete this session"
+                                                title="Delete this plan"
                                             >
                                                 <TrashIcon className="w-5 h-5"/>
                                             </button>
@@ -112,7 +156,7 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
                     message={
                         <>
                             Are you sure you want to permanently delete this plan?
-                            <p className="mt-2 text-text-secondary bg-primary p-2 rounded-md font-mono text-sm">{sessionToDelete.id}</p>
+                            <p className="mt-2 text-text-secondary bg-primary p-2 rounded-md font-semibold text-sm truncate">{sessionToDelete.name}</p>
                             This action cannot be undone.
                         </>
                     }
