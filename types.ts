@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 // Fix: Define and export all necessary enums and interfaces for the application.
 // This file should only contain type definitions.
 
@@ -73,6 +75,7 @@ export interface AppState {
 
 export interface SavedSession {
     id: string;
+    name: string;
     timestamp: Date;
     taskCount: number;
 }
