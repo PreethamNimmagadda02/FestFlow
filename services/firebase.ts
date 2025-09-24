@@ -5,7 +5,7 @@ import { getAuth } from 'firebase/auth';
 // This configuration is populated by environment variables.
 // Ensure your build environment is set up to provide these values.
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyArseSyVsclEckvJyKk0Hy5Dmoha-Pu77M",
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
   authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "festflow-805bb.firebaseapp.com",
   projectId: process.env.VITE_FIREBASE_PROJECT_ID || "festflow-805bb",
   storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "festflow-805bb.firebasestorage.app",
