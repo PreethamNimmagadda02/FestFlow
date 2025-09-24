@@ -31,7 +31,7 @@ export interface FileAttachment {
 }
 
 export interface Task {
-    id: string;
+    id:string;
     title: string;
     description: string;
     assignedTo: AgentName;
@@ -60,4 +60,19 @@ export interface ActivityLog {
     agent: AgentName;
     message: string;
     timestamp: Date;
+}
+
+export interface AppState {
+    tasks: Task[];
+    approvals: Approval[];
+    logs: ActivityLog[];
+    agentStatus: Record<AgentName, AgentStatus>;
+    agentWork: Record<AgentName, string | null>;
+    isStarted: boolean;
+}
+
+export interface SavedSession {
+    id: string;
+    timestamp: Date;
+    taskCount: number;
 }
