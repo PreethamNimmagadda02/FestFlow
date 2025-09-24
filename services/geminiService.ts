@@ -4,9 +4,18 @@ import { AgentName, Task, TaskStatus } from "../types";
 // Set to true to use mock data and bypass the Gemini API, enabling offline use.
 const IS_OFFLINE = false;
 
-// Initialize the Google GenAI client
-// The API key is expected to be set as an environment variable
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+// Lazy-initialize the Google GenAI client to prevent crashes if the API key is
+// not present in an environment where the API is not being used (e.g., offline mode).
+let ai: GoogleGenAI | null = null;
+
+const getAI = (): GoogleGenAI => {
+    if (!ai) {
+        // The API key is expected to be set as an environment variable.
+        // This constructor will only be called when IS_OFFLINE is false.
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    }
+    return ai;
+};
 
 /**
  * MOCK IMPLEMENTATION FOR OFFLINE USE
@@ -306,7 +315,7 @@ Your instructions are:
 
     try {
         const response = await callGeminiWithRetry(async () => {
-            return await ai.models.generateContent({
+            return await getAI().models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: { parts: [{ text: `Decompose the following goal into a task plan: "${goal}"` }] },
                 config: {
@@ -382,7 +391,7 @@ export const executeTask = async (task: Task): Promise<string> => {
 
     try {
         const response = await callGeminiWithRetry(async () => {
-            return await ai.models.generateContent({
+            return await getAI().models.generateContent({
                 model: 'gemini-2.5-flash',
                 contents: prompt,
                 config: {
