@@ -97,7 +97,8 @@ const App: React.FC = () => {
     const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
     const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
     const [loadSessionsError, setLoadSessionsError] = useState<string | null>(null);
-    const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+    // Fix: Use ReturnType<typeof setTimeout> for browser compatibility instead of NodeJS.Timeout.
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isDeleteCurrentModalOpen, setIsDeleteCurrentModalOpen] = useState(false);
 
@@ -714,6 +715,10 @@ const App: React.FC = () => {
         return <FullScreenLoader />;
     }
 
+    if (!currentUser) {
+        return <LoginScreen />;
+    }
+
     return (
         <div className="min-h-screen bg-primary text-light flex flex-col">
             <Header 
@@ -724,47 +729,37 @@ const App: React.FC = () => {
                 onLoadClick={handleOpenLoadModal}
             />
             <main className="flex-grow p-4 md:p-8 space-y-8 flex flex-col">
-                {!currentUser ? (
-                    <div className="flex-grow flex items-center justify-center">
-                        <LoginScreen />
-                    </div>
-                ) : (
-                    <>
-                        <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
-                        {error && <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg animate-fadeIn">{error}</div>}
-                        {isStarted && (
-                            <Dashboard
-                                tasks={tasks}
-                                approvals={approvals}
-                                logs={logs}
-                                agentStatus={agentStatus}
-                                agentWork={agentWork}
-                                onApproval={handleApproval}
-                                onCompleteTask={handleCompleteTask}
-                                onReassignTask={handleReassignTask}
-                                onTaskClick={setSelectedTask}
-                                onViewResult={setViewingResultTask}
-                                onTaskUpdate={handleUpdateTask}
-                                onGanttSaveChanges={handleGanttSaveChanges}
-                            />
-                        )}
-                    </>
+                <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
+                {error && <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg animate-fadeIn">{error}</div>}
+                {isStarted && (
+                    <Dashboard
+                        tasks={tasks}
+                        approvals={approvals}
+                        logs={logs}
+                        agentStatus={agentStatus}
+                        agentWork={agentWork}
+                        onApproval={handleApproval}
+                        onCompleteTask={handleCompleteTask}
+                        onReassignTask={handleReassignTask}
+                        onTaskClick={setSelectedTask}
+                        onViewResult={setViewingResultTask}
+                        onTaskUpdate={handleUpdateTask}
+                        onGanttSaveChanges={handleGanttSaveChanges}
+                    />
                 )}
             </main>
             {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} onTaskUpdate={handleUpdateTask} />}
             {viewingResultTask && <ResultModal task={viewingResultTask} onClose={() => setViewingResultTask(null)} />}
-            {currentUser && 
-                <LoadSessionModal 
-                    isOpen={isLoadModalOpen}
-                    onClose={() => setIsLoadModalOpen(false)}
-                    sessions={savedSessions}
-                    onLoadSession={handleLoadState}
-                    onDeleteSession={handleDeleteSession}
-                    onUpdateSessionName={handleUpdateSessionName}
-                    isLoading={isLoadingSessions}
-                    error={loadSessionsError}
-                />
-            }
+            <LoadSessionModal 
+                isOpen={isLoadModalOpen}
+                onClose={() => setIsLoadModalOpen(false)}
+                sessions={savedSessions}
+                onLoadSession={handleLoadState}
+                onDeleteSession={handleDeleteSession}
+                onUpdateSessionName={handleUpdateSessionName}
+                isLoading={isLoadingSessions}
+                error={loadSessionsError}
+            />
             <ConfirmationModal
                 isOpen={isResetModalOpen}
                 onClose={() => setIsResetModalOpen(false)}
