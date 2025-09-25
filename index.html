@@ -5,6 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FestFlow: AI Event Orchestration</title>
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -67,6 +68,12 @@
         }
         ::-webkit-scrollbar-thumb:hover {
             background: #6366F1;
+        }
+        /* Accessibility: Add a clear focus ring for keyboard navigation */
+        *:focus-visible {
+            outline: 2px solid #6366F1 !important;
+            outline-offset: 2px !important;
+            border-radius: 0.25rem !important;
         }
     </style>
 <script type="importmap">
