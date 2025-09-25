@@ -1,17 +1,18 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getPerformance } from 'firebase/performance';
 
 // This configuration is populated by environment variables.
 // Ensure your build environment is set up to provide these values.
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY,
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_FIREBASE_APP_ID,
-  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyArseSyVsclEckvJyKk0Hy5Dmoha-Pu77M",
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "festflow-805bb.firebaseapp.com",
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "festflow-805bb",
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "festflow-805bb.firebasestorage.app",
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "382784963863",
+  appId: process.env.VITE_FIREBASE_APP_ID || "1:382784963863:web:b521a8a0ae8ba6004ae352",
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || "G-CLPLYWPZ5K"
 };
 
 // Initialize Firebase only if it hasn't been initialized yet.
@@ -26,3 +27,5 @@ if (!getApps().length) {
 export const db = getFirestore(app);
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
+// Initialize Firebase Performance Monitoring and get a reference to the service
+export const performance = getPerformance(app);
