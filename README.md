@@ -13,6 +13,8 @@ You can view the live application here: **[https://festflow-805bb.web.app/](http
 
 ## System Design Documentation of FestFlow
 
+Of course, here is the system design document for FestFlow.
+
 ### System Architecture
 
 FestFlow is a **client-server application** that utilizes a **multi-agent system** on the backend. The architecture is designed to be modular and scalable, with a clear separation of concerns between the frontend and the backend services.
@@ -20,8 +22,6 @@ FestFlow is a **client-server application** that utilizes a **multi-agent system
 * **Frontend**: A responsive **single-page application (SPA)** built with **React** and styled with **Tailwind CSS**. It provides an interface for defining event goals, monitoring progress, and approving AI-generated content.
 * **Backend**: A **serverless architecture** powered by the **Google Gemini API**. This backend is responsible for the core AI logic, including goal decomposition and task execution.
 * **AI Orchestration**: The system's intelligence lies in a team of specialized AI agents, each with a distinct role. A **MasterPlannerAgent** breaks down the primary goal into smaller tasks and delegates them to other agents responsible for logistics, sponsorship, and marketing.
-
----
 
 ### Data Design
 
@@ -33,10 +33,6 @@ The application's data is structured around several key entities that track the 
 * **Agent Status**: Tracks the current state of each AI agent (idle, working, or error).
 * **Data Flow Diagram**
   
-  <img width="987" height="246" alt="Screenshot 2025-09-14 at 8 45 32 AM" src="https://github.com/user-attachments/assets/aa9a00a0-0fc6-4f24-a08c-db3beb74c0c9" />
-
----
-
 ### Component Breakdown
 
 The user interface is composed of a series of modular **React components**.
@@ -48,8 +44,6 @@ The user interface is composed of a series of modular **React components**.
 * **`GanttChart.tsx`**: An alternative view for visualizing task dependencies and timelines.
 * **`FestivalSetupForm.tsx`**: The initial form where users input their high-level event goals, which triggers the AI planning process.
 
----
-
 ### Chosen Technologies
 
 The technologies for FestFlow were selected to prioritize **rapid development**, **scalability**, and a **modern user experience**.
@@ -58,7 +52,6 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 * **Tailwind CSS**: A utility-first CSS framework that enables rapid styling and ensures a consistent design.
 * **Google Gemini API**: A large language model that serves as the application's intelligent backend, handling goal decomposition and content generation.
 * **Vite**: A frontend build tool that offers a fast development server and optimized build process, enhancing developer productivity and application performance.
-
 ---
 
 ### Growth Strategy
