@@ -56,16 +56,9 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
 
 ### Growth Strategy
 
-### Phase 2: Enhanced Interactivity and User Experience
-
-* **Interactive Gantt Chart:** Allow users to drag and drop tasks on the Gantt chart to adjust schedules and dependencies.
-* **Notifications:** Implement a notification system to alert users of important events, such as when a task is completed or an approval is required.
-* **Improved Task Management:**
-    * Allow for the creation of sub-tasks within larger tasks.
-    * Add the ability to attach files to tasks (e.g., contracts, design mockups).
-    * Implement a search and filtering system for tasks.
-
 ### Phase 3: Real-World Integration and Automation
+
+* **Notifications:** Implement a notification system to alert users of important events, such as when a task is completed or an approval is required.
 
 * **API Integrations:**
     * **LogisticsCoordinatorAgent:** Connect to Calendar API to automatically schedule events and reminders. Integrate with mapping services like Maps for venue and travel planning.
