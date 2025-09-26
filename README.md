@@ -13,8 +13,6 @@ You can view the live application here: **[https://festflow-805bb.web.app/](http
 
 ## System Design Documentation of FestFlow
 
-Of course, here is the system design document for FestFlow.
-
 ### System Architecture
 
 FestFlow is a **client-server application** that utilizes a **multi-agent system** on the backend. The architecture is designed to be modular and scalable, with a clear separation of concerns between the frontend and the backend services.
@@ -32,6 +30,8 @@ The application's data is structured around several key entities that track the 
 * **Activity Logs**: A time-stamped record of all significant events and actions taken by the AI agents.
 * **Agent Status**: Tracks the current state of each AI agent (idle, working, or error).
 * **Data Flow Diagram**
+  <img width="867" height="693" alt="Screenshot 2025-09-26 at 11 14 06 PM" src="https://github.com/user-attachments/assets/9801aae5-ded7-491e-8377-36bb0c057ebf" />
+
   
 ### Component Breakdown
 
