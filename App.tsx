@@ -1,10 +1,11 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { EventSetupForm } from './components/FestivalSetupForm';
 import { Dashboard } from './components/Dashboard';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { LoadSessionModal } from './components/LoadSessionModal';
-import { AgentName, Task, Approval, ActivityLog, AgentStatus, TaskStatus, AppState, SavedSession } from './types';
+import { AgentName, Task, Approval, ActivityLog, AgentStatus, TaskStatus, AppState, SavedSession, UserProfile } from './types';
 import { AGENT_NAMES, MAX_TASK_RETRIES } from './constants';
 import { decomposeGoal, executeTask } from './services/geminiService';
 import { createSession, updateSession, getSavedSessions, loadSessionFromFirestore, deleteSession, updateSessionName } from './services/firestoreService';
@@ -12,6 +13,7 @@ import { useAuth } from './context/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
 import { FullScreenLoader } from './components/FullScreenLoader';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { CompleteProfileModal } from './components/CompleteProfileModal';
 
 const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
     return (
@@ -72,7 +74,7 @@ const getInitialState = <T,>(key: string, defaultValue: T): T => {
 
 
 const App: React.FC = () => {
-    const { currentUser, loading } = useAuth();
+    const { currentUser, loading, isProfileComplete, userProfile } = useAuth();
     const initialAgentStatus = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: AgentStatus.IDLE}), {} as Record<AgentName, AgentStatus>);
     const initialAgentWork = AGENT_NAMES.reduce((acc, name) => ({...acc, [name]: null}), {} as Record<AgentName, string | null>);
     
@@ -83,6 +85,7 @@ const App: React.FC = () => {
     const [agentWork, setAgentWork] = useState<Record<AgentName, string | null>>(() => getInitialState('festflow_agentWork', initialAgentWork));
     const [isStarted, setIsStarted] = useState<boolean>(() => getInitialState('festflow_isStarted', false));
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => getInitialState('festflow_currentSessionId', null));
+    const [projectName, setProjectName] = useState<string | null>(() => getInitialState('festflow_projectName', null));
 
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -97,7 +100,6 @@ const App: React.FC = () => {
     const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
     const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(false);
     const [loadSessionsError, setLoadSessionsError] = useState<string | null>(null);
-    // Fix: Use ReturnType<typeof setTimeout> for browser compatibility instead of NodeJS.Timeout.
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isDeleteCurrentModalOpen, setIsDeleteCurrentModalOpen] = useState(false);
@@ -116,14 +118,19 @@ const App: React.FC = () => {
             } else {
                 localStorage.removeItem('festflow_currentSessionId');
             }
+             if (projectName) {
+                localStorage.setItem('festflow_projectName', JSON.stringify(projectName));
+            } else {
+                localStorage.removeItem('festflow_projectName');
+            }
         } catch (e) {
             console.error("Failed to save state to local storage", e);
         }
-    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentSessionId]);
+    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentSessionId, projectName]);
 
     // Auto-save effect
     useEffect(() => {
-        if (!isStarted || !currentUser || !currentUser.email || !currentSessionId) {
+        if (!isStarted || !currentUser || !currentUser.uid || !currentSessionId) {
             return;
         }
 
@@ -135,7 +142,7 @@ const App: React.FC = () => {
         debounceTimer.current = setTimeout(async () => {
             try {
                 const currentState: AppState = { tasks, approvals, logs, agentStatus, agentWork, isStarted };
-                await updateSession(currentUser.email!, currentSessionId, currentState);
+                await updateSession(currentUser.uid!, currentSessionId, currentState, projectName);
                 setSaveStatus('saved');
             } catch (error) {
                 console.error("Auto-save failed:", error);
@@ -148,7 +155,7 @@ const App: React.FC = () => {
                 clearTimeout(debounceTimer.current);
             }
         };
-    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentUser, currentSessionId]);
+    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentUser, currentSessionId, projectName]);
 
     useEffect(() => {
         if (selectedTask) {
@@ -180,15 +187,11 @@ const App: React.FC = () => {
                 addLog(task.assignedTo, `Generating content for "${task.title}"...`);
                 const content = await executeTask(task);
                 
-                // Perform state updates safely after the async operation.
-                // This combined update prevents race conditions from nested state setters.
                 setTasks(currentTasks => {
                     const taskToUpdate = currentTasks.find(t => t.id === task.id);
     
                     if (taskToUpdate && taskToUpdate.status === TaskStatus.IN_PROGRESS) {
-                        // Task is still valid, so create the approval.
                         setApprovals(prevApprovals => {
-                            // Safety check: Don't add a duplicate approval card.
                             if (prevApprovals.some(a => a.taskId === task.id && a.status === 'pending')) {
                                 return prevApprovals;
                             }
@@ -207,17 +210,15 @@ const App: React.FC = () => {
     
                         addLog(task.assignedTo, `Task "${task.title}" requires approval.`);
                         
-                        // Return the new tasks array with the updated status.
                         return currentTasks.map(t =>
                             t.id === task.id ? { ...t, status: TaskStatus.AWAITING_APPROVAL, progress: 100, customPrompt: undefined } : t
                         );
                     } else {
-                        // Task state changed while AI was working, so discard the result.
                         addLog(AgentName.MASTER_PLANNER, `Discarding generated content for "${task.title}" as it was manually completed or changed.`);
                         return currentTasks;
                     }
                 });
-            } else { // Logic for non-content generation tasks (e.g., logistics)
+            } else {
                 const processingTime = 2000 + Math.random() * 3000;
                 const updateInterval = 100;
                 const progressSteps = processingTime / updateInterval;
@@ -251,13 +252,12 @@ const App: React.FC = () => {
             if (currentRetries < MAX_TASK_RETRIES) {
                 addLog(task.assignedTo, `Error on task "${task.title}": ${errorMessage}. Retrying (${currentRetries + 1}/${MAX_TASK_RETRIES}).`);
                 setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, retries: currentRetries + 1, progress: 0 } : t)));
-                 processingTasks.current.delete(task.id); // Release lock to allow retry
+                 processingTasks.current.delete(task.id);
             } else {
                 addLog(task.assignedTo, `Error on task "${task.title}": ${errorMessage}. Task failed after ${MAX_TASK_RETRIES} retries.`);
                 setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: TaskStatus.FAILED, progress: 0 } : t)));
                 setAgentStatus(prev => ({ ...prev, [task.assignedTo]: AgentStatus.ERROR }));
                 setAgentWork(prev => ({ ...prev, [task.assignedTo]: null }));
-                // Release lock on final failure.
                 processingTasks.current.delete(task.id);
             }
         }
@@ -317,9 +317,9 @@ const App: React.FC = () => {
                     const originalTasksMap = new Map(currentTasks.map(t => [t.id, t]));
                     newTasks.forEach(newTask => {
                         const originalTask = originalTasksMap.get(newTask.id);
-                        if(originalTask && originalTask.status !== newTask.status && parentUpdates.has(newTask.id)) {
+                        if(originalTask && (originalTask as Task).status !== newTask.status && parentUpdates.has(newTask.id)) {
                             if(newTask.status === TaskStatus.COMPLETED) addLog(newTask.assignedTo, `All sub-tasks for "${newTask.title}" are complete. Marking parent task as complete.`);
-                            else if (originalTask.status === TaskStatus.COMPLETED) addLog(newTask.assignedTo, `A sub-task for "${newTask.title}" is no longer complete. Reverting parent task to In Progress.`);
+                            else if ((originalTask as Task).status === TaskStatus.COMPLETED) addLog(newTask.assignedTo, `A sub-task for "${newTask.title}" is no longer complete. Reverting parent task to In Progress.`);
                             else if (newTask.status === TaskStatus.IN_PROGRESS) addLog(AgentName.MASTER_PLANNER, `A sub-task for "${newTask.title}" is ready. Marking parent task as In Progress.`);
                         }
                     });
@@ -393,6 +393,7 @@ const App: React.FC = () => {
         setSelectedTask(null);
         setViewingResultTask(null);
         setCurrentSessionId(null);
+        setProjectName(null);
         setSaveStatus('idle');
         processingTasks.current.clear();
         Object.values(progressIntervals.current).forEach(clearInterval);
@@ -405,10 +406,10 @@ const App: React.FC = () => {
         localStorage.removeItem('festflow_agentWork');
         localStorage.removeItem('festflow_isStarted');
         localStorage.removeItem('festflow_currentSessionId');
+        localStorage.removeItem('festflow_projectName');
 
     }, [initialAgentStatus, initialAgentWork]);
 
-    // Automatically reset the state if the user logs out
     useEffect(() => {
         if (!currentUser && isStarted) {
             handleReset();
@@ -416,7 +417,7 @@ const App: React.FC = () => {
     }, [currentUser, isStarted, handleReset]);
 
     const handleGoalSubmit = useCallback(async (goal: string) => {
-        if (!currentUser || !currentUser.email) {
+        if (!currentUser || !currentUser.uid) {
             setError("Authentication error: You must be logged in to create a plan.");
             return;
         }
@@ -442,7 +443,7 @@ const App: React.FC = () => {
                 isStarted: true,
             };
 
-            const newSessionId = await createSession(currentUser.email, initialState, goal);
+            const newSessionId = await createSession(currentUser.uid, initialState, goal);
             
             setTasks(initialState.tasks);
             setApprovals(initialState.approvals);
@@ -451,13 +452,14 @@ const App: React.FC = () => {
             setAgentWork(initialState.agentWork);
             setIsStarted(initialState.isStarted);
             setCurrentSessionId(newSessionId);
+            setProjectName(goal);
 
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
             setError(errorMessage);
             addLog(AgentName.MASTER_PLANNER, `Error: ${errorMessage}`);
             setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.ERROR }));
-            setIsStarted(false); // Reset started state on failure
+            setIsStarted(false);
         } finally {
             setIsLoading(false);
             setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.IDLE }));
@@ -484,11 +486,10 @@ const App: React.FC = () => {
     }, [tasks, addLog]);
 
     useEffect(() => {
-        // A task is a parent if its ID appears in another task's `parentId` field.
         const parentTaskIds = new Set(tasks.map(t => t.parentId).filter((id): id is string => !!id));
 
         const tasksToProcess = tasks.filter(task => 
-            !parentTaskIds.has(task.id) && // Filter out tasks that are parents
+            !parentTaskIds.has(task.id) &&
             task.status === TaskStatus.IN_PROGRESS &&
             !processingTasks.current.has(task.id) &&
             (task.progress ?? 0) < 100
@@ -512,8 +513,6 @@ const App: React.FC = () => {
 
         if (relatedTask) {
             addLog(AgentName.MASTER_PLANNER, `Decision received for "${relatedTask.title}": ${decision.toUpperCase()}`);
-
-            // Release the processing lock for this task, as a decision has been made.
             processingTasks.current.delete(approval.taskId);
 
             if (decision === 'approved') {
@@ -525,7 +524,7 @@ const App: React.FC = () => {
                     customPrompt: undefined,
                 } : t));
                 addLog(relatedTask.assignedTo, `Task approved: "${relatedTask.title}". Finalizing.`);
-            } else { // 'rejected'
+            } else {
                  const logMessage = customPrompt 
                      ? `Task rejected: "${relatedTask.title}". Will attempt to regenerate with a new prompt.`
                      : `Task rejected: "${relatedTask.title}". Will attempt to regenerate.`;
@@ -587,7 +586,7 @@ const App: React.FC = () => {
     }, [addLog]);
 
     const handleOpenLoadModal = useCallback(async () => {
-        if (!currentUser || !currentUser.email) {
+        if (!currentUser || !currentUser.uid) {
             setError("You must be logged in to load sessions.");
             return;
         }
@@ -595,7 +594,7 @@ const App: React.FC = () => {
         setIsLoadingSessions(true);
         setLoadSessionsError(null);
         try {
-            const sessions = await getSavedSessions(currentUser.email);
+            const sessions = await getSavedSessions(currentUser.uid);
             setSavedSessions(sessions);
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -605,8 +604,8 @@ const App: React.FC = () => {
         }
     }, [currentUser]);
 
-    const handleLoadState = useCallback(async (sessionId: string) => {
-        if (!currentUser || !currentUser.email) {
+    const handleLoadState = useCallback(async (sessionId: string, sessionName: string) => {
+        if (!currentUser || !currentUser.uid) {
             setError('Authentication error: No user is logged in.');
             return;
         }
@@ -614,7 +613,7 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const loadedState = await loadSessionFromFirestore(currentUser.email, sessionId);
+            const loadedState = await loadSessionFromFirestore(currentUser.uid, sessionId);
             
             handleReset();
             
@@ -626,6 +625,7 @@ const App: React.FC = () => {
                 setAgentWork(loadedState.agentWork);
                 setIsStarted(loadedState.isStarted);
                 setCurrentSessionId(sessionId);
+                setProjectName(sessionName);
                 addLog(AgentName.MASTER_PLANNER, `Successfully loaded session ${sessionId.slice(0,6)}...`);
                 setIsLoading(false);
             }, 100);
@@ -638,16 +638,34 @@ const App: React.FC = () => {
     }, [handleReset, addLog, currentUser]);
     
     const handleUpdateSessionName = async (sessionId: string, newName: string) => {
-        if (!currentUser || !currentUser.email) return;
+        if (!currentUser || !currentUser.uid) return;
         setLoadSessionsError(null);
         try {
-            await updateSessionName(currentUser.email, sessionId, newName);
+            await updateSessionName(currentUser.uid, sessionId, newName);
             setSavedSessions(currentSessions =>
                 currentSessions.map(s => s.id === sessionId ? { ...s, name: newName } : s)
             );
+             if (sessionId === currentSessionId) {
+                setProjectName(newName);
+            }
         } catch (error) {
             console.error("Failed to update session name:", error);
             setLoadSessionsError("Failed to update session name.");
+        }
+    };
+
+     const handleUpdateProjectName = async (newName: string) => {
+        if (!currentUser?.uid || !currentSessionId || !newName.trim() || newName === projectName) {
+            return;
+        }
+        const oldName = projectName;
+        setProjectName(newName.trim()); // Optimistic update
+        try {
+            await updateSessionName(currentUser.uid, currentSessionId, newName.trim());
+        } catch (error) {
+            console.error("Failed to update project name:", error);
+            setError("Failed to update project name.");
+            setProjectName(oldName); // Revert on error
         }
     };
 
@@ -657,9 +675,9 @@ const App: React.FC = () => {
     };
     
     const handleDeleteCurrentSession = useCallback(async () => {
-        if (currentUser && currentUser.email && currentSessionId) {
+        if (currentUser && currentUser.uid && currentSessionId) {
             try {
-                await deleteSession(currentUser.email, currentSessionId);
+                await deleteSession(currentUser.uid, currentSessionId);
                 addLog(AgentName.MASTER_PLANNER, `Deleted current session ${currentSessionId.slice(0,6)}...`);
                 handleReset();
             } catch (error) {
@@ -671,37 +689,32 @@ const App: React.FC = () => {
     }, [currentUser, currentSessionId, addLog, handleReset]);
 
     const handleDeleteSession = useCallback(async (sessionId: string) => {
-        if (!currentUser || !currentUser.email) {
+        if (!currentUser || !currentUser.uid) {
             setLoadSessionsError("You must be logged in to delete sessions.");
             return;
         }
     
-        // If deleting the currently active plan, delegate to the specific function
-        // that handles both DB deletion and resetting the local state to the landing page.
         if (sessionId === currentSessionId) {
             await handleDeleteCurrentSession();
-            setIsLoadModalOpen(false); // Ensure the modal is closed after the app resets
+            setIsLoadModalOpen(false);
             return;
         }
     
-        // If deleting any other plan, just remove it from the database and refresh the list.
         setIsLoadingSessions(true);
         setLoadSessionsError(null);
     
         try {
-            await deleteSession(currentUser.email, sessionId);
+            await deleteSession(currentUser.uid, sessionId);
             addLog(AgentName.MASTER_PLANNER, `Deleted session ${sessionId.slice(0,6)}...`);
             
-            // Re-fetch the list from the database to ensure the UI is in sync.
-            const freshSessions = await getSavedSessions(currentUser.email);
+            const freshSessions = await getSavedSessions(currentUser.uid);
             setSavedSessions(freshSessions);
     
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
             setLoadSessionsError(`Failed to delete session: ${errorMessage}`);
             try {
-                // Attempt to re-fetch even on error to ensure consistency
-                const sessions = await getSavedSessions(currentUser.email);
+                const sessions = await getSavedSessions(currentUser.uid);
                 setSavedSessions(sessions);
             } catch (fetchError) {
                  console.error("Failed to re-fetch sessions after deletion error:", fetchError);
@@ -718,6 +731,10 @@ const App: React.FC = () => {
     if (!currentUser) {
         return <LoginScreen />;
     }
+    
+    if (!isProfileComplete) {
+        return <CompleteProfileModal />;
+    }
 
     return (
         <div className="min-h-screen bg-primary text-light flex flex-col">
@@ -727,6 +744,10 @@ const App: React.FC = () => {
                 isPlanSaved={!!currentSessionId}
                 saveStatus={isStarted ? saveStatus : 'idle'}
                 onLoadClick={handleOpenLoadModal}
+                projectName={projectName}
+                onUpdateProjectName={handleUpdateProjectName}
+                userProfile={userProfile}
+                isStarted={isStarted}
             />
             <main className="flex-grow p-4 md:p-8 space-y-8 flex flex-col">
                 <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
