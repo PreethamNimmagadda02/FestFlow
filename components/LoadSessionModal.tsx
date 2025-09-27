@@ -8,7 +8,7 @@ interface LoadSessionModalProps {
     isOpen: boolean;
     onClose: () => void;
     sessions: SavedSession[];
-    onLoadSession: (sessionId: string) => void;
+    onLoadSession: (sessionId: string, sessionName: string) => void;
     onDeleteSession: (sessionId: string) => Promise<void>;
     onUpdateSessionName: (sessionId: string, newName: string) => Promise<void>;
     isLoading: boolean;
@@ -53,7 +53,7 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
         if (!editingSessionId) return;
         const originalSession = sessions.find(s => s.id === editingSessionId);
         if (originalSession && editingName.trim() && editingName !== originalSession.name) {
-            await onUpdateSessionName(editingSessionId, editingName);
+            await onUpdateSessionName(editingSessionId, editingName.trim());
         }
         setEditingSessionId(null);
     };
@@ -118,7 +118,7 @@ export const LoadSessionModal: React.FC<LoadSessionModalProps> = ({ isOpen, onCl
                                         </div>
                                         <div className="flex items-center space-x-2 flex-shrink-0 ml-4">
                                             <button 
-                                                onClick={() => onLoadSession(session.id)}
+                                                onClick={() => onLoadSession(session.id, session.name)}
                                                 className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity text-sm font-semibold"
                                             >
                                                 Load
