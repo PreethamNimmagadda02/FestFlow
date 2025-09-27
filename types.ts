@@ -79,3 +79,14 @@ export interface SavedSession {
     timestamp: Date;
     taskCount: number;
 }
+
+export interface UserProfile {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoURL: string | null;
+    institution?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+}
