@@ -9,6 +9,8 @@ import { TrashIcon } from './icons/TrashIcon';
 import { FilePlusIcon } from './icons/FilePlusIcon';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { LogOutIcon } from './icons/LogOutIcon';
+import { UserProfile } from '../types';
+import { PencilIcon } from './icons/PencilIcon';
 
 interface HeaderProps {
     onResetClick: () => void;
@@ -16,6 +18,10 @@ interface HeaderProps {
     isPlanSaved: boolean;
     saveStatus: 'idle' | 'saving' | 'saved' | 'error';
     onLoadClick: () => void;
+    projectName: string | null;
+    onUpdateProjectName: (newName: string) => void;
+    userProfile: UserProfile | null;
+    isStarted: boolean;
 }
 
 const AutoSaveIndicator: React.FC<{ status: HeaderProps['saveStatus'] }> = ({ status }) => {
@@ -28,14 +34,72 @@ const AutoSaveIndicator: React.FC<{ status: HeaderProps['saveStatus'] }> = ({ st
     }[status];
 
     return (
-        <div className={`flex items-center space-x-2 text-sm font-semibold transition-colors duration-300 ${content.color}`}>
+        <div className={`flex items-center space-x-2 text-sm font-medium transition-colors duration-300 ${content.color}`}>
             {content.icon}
             <span>{content.text}</span>
         </div>
     );
 };
 
-export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDeleteCurrentClick, isPlanSaved, saveStatus, onLoadClick }) => {
+const ProjectNameEditor: React.FC<{
+    projectName: string;
+    onUpdateProjectName: (newName: string) => void;
+}> = ({ projectName, onUpdateProjectName }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedName, setEditedName] = useState(projectName);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        setEditedName(projectName);
+    }, [projectName]);
+
+    useEffect(() => {
+        if (isEditing) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isEditing]);
+
+    const handleSave = () => {
+        if (editedName.trim() && editedName !== projectName) {
+            onUpdateProjectName(editedName);
+        }
+        setIsEditing(false);
+    };
+
+    if (isEditing) {
+        return (
+            <input
+                ref={inputRef}
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave();
+                    if (e.key === 'Escape') {
+                        setEditedName(projectName);
+                        setIsEditing(false);
+                    }
+                }}
+                className="bg-primary border-2 border-accent rounded-lg p-2 text-center text-lg font-bold text-light focus:outline-none focus:ring-2 focus:ring-highlight"
+            />
+        );
+    }
+
+    return (
+        <div 
+            onClick={() => setIsEditing(true)}
+            className="flex items-center justify-center space-x-2 cursor-pointer group p-2 rounded-lg hover:bg-accent"
+            title="Click to edit project name"
+        >
+            <h2 className="text-xl font-bold text-light truncate">{projectName}</h2>
+            <PencilIcon className="w-4 h-4 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+    );
+};
+
+export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDeleteCurrentClick, isPlanSaved, saveStatus, onLoadClick, projectName, onUpdateProjectName, userProfile, isStarted }) => {
     const { currentUser, loading, login, logout } = useAuth();
     const isAuthenticated = !!currentUser;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -55,13 +119,24 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
     }, []);
 
     return (
-        <header className="bg-secondary p-4 shadow-lg flex items-center justify-between border-b border-accent">
-            <div className="flex items-center space-x-3">
-                <FestFlowLogoIcon className="w-8 h-8 text-highlight" />
-                <h1 className="text-2xl font-bold tracking-wider text-light">FestFlow</h1>
+        <header className="bg-secondary p-3 shadow-lg flex items-center justify-between border-b border-accent h-20">
+            <div className="flex-1 flex justify-start">
+                <div className="flex items-center space-x-3">
+                    <FestFlowLogoIcon className="w-9 h-9 text-highlight" />
+                    <h1 className="text-2xl font-bold tracking-wider text-light hidden md:block">FestFlow</h1>
+                </div>
             </div>
-            <div className="flex items-center space-x-3">
-                <AutoSaveIndicator status={saveStatus} />
+
+            <div className="flex-1 flex justify-center min-w-0 px-4">
+                {isStarted && projectName && (
+                   <ProjectNameEditor projectName={projectName} onUpdateProjectName={onUpdateProjectName} />
+                )}
+            </div>
+
+            <div className="flex-1 flex justify-end items-center space-x-3">
+                <div className="hidden sm:block">
+                    <AutoSaveIndicator status={saveStatus} />
+                </div>
                 
                 <div className="relative" ref={menuRef}>
                     <button
@@ -86,7 +161,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
                                     onClick={() => { onLoadClick(); setIsMenuOpen(false); }}
                                     disabled={!isAuthenticated}
                                     className="w-full flex items-center space-x-3 rounded-md px-3 py-2 text-sm text-left text-light transition-colors hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title={isAuthenticated ? "Load Session from Cloud" : "Please log in to load"}
+                                    title={isAuthenticated ? "Load Plan from Cloud" : "Please log in to load"}
                                     role="menuitem"
                                 >
                                     <FolderOpenIcon className="w-4 h-4 text-text-secondary" />
@@ -131,12 +206,15 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
                     )}
                 </div>
                 
-                <div className="w-px h-6 bg-accent mx-2"></div>
+                <div className="w-px h-6 bg-accent mx-1"></div>
                 {loading ? (
-                    <div className="w-8 h-8 rounded-full bg-accent animate-pulse"></div>
+                    <div className="w-9 h-9 rounded-full bg-accent animate-pulse"></div>
                 ) : currentUser ? (
                     <div className="flex items-center space-x-3">
-                         <img src={currentUser.photoURL || undefined} alt={currentUser.displayName || 'User'} className="w-8 h-8 rounded-full border-2 border-highlight" title={`Logged in as ${currentUser.displayName}`}/>
+                         <div className="text-right hidden md:block">
+                            <p className="font-semibold text-sm text-light truncate max-w-[200px]" title={userProfile?.institution || ''}>{userProfile?.institution}</p>
+                        </div>
+                         <img src={currentUser.photoURL || undefined} alt="User Profile" className="w-9 h-9 rounded-full border-2 border-highlight" title={userProfile?.institution || 'User Profile'}/>
                     </div>
                 ) : (
                     <button 
