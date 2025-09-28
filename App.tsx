@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { EventSetupForm } from './components/FestivalSetupForm';
@@ -15,7 +16,14 @@ import { FullScreenLoader } from './components/FullScreenLoader';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { CompleteProfileModal } from './components/CompleteProfileModal';
 
-const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({ task, onClose }) => {
+const ResultModal: React.FC<{ task: Task; onClose: () => void; onSave: (newContent: string) => void; }> = React.memo(({ task, onClose, onSave }) => {
+    const [editableContent, setEditableContent] = useState(task.approvedContent || '');
+
+    const handleSave = () => {
+        onSave(editableContent);
+        onClose(); // Close after saving
+    };
+
     return (
         <div 
             className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fadeIn"
@@ -27,18 +35,29 @@ const ResultModal: React.FC<{ task: Task; onClose: () => void }> = React.memo(({
                 style={{animationDuration: '0.3s'}}
             >
                 <div className="p-4 border-b border-accent flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-highlight">Result: {task.title}</h3>
+                    <h3 className="text-lg font-bold text-highlight">Edit Result: {task.title}</h3>
                     <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
                 </div>
                 <div className="p-6 overflow-y-auto">
-                     <pre className="text-text-secondary whitespace-pre-wrap font-sans text-sm bg-primary p-4 rounded-lg border border-accent">{task.approvedContent}</pre>
+                     <textarea
+                        value={editableContent}
+                        onChange={(e) => setEditableContent(e.target.value)}
+                        className="w-full h-64 p-3 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light whitespace-pre-wrap font-sans text-sm"
+                        aria-label="Editable task result"
+                    />
                 </div>
-                 <div className="p-4 border-t border-accent text-right">
+                 <div className="p-4 border-t border-accent flex justify-end items-center space-x-3">
                     <button 
                         onClick={onClose}
-                        className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity"
+                        className="px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold"
                     >
                         Close
+                    </button>
+                    <button 
+                        onClick={handleSave}
+                        className="px-4 py-2 rounded-lg bg-success text-white hover:opacity-90 transition-opacity font-semibold"
+                    >
+                        Save & Close
                     </button>
                 </div>
             </div>
@@ -770,7 +789,18 @@ const App: React.FC = () => {
                 )}
             </main>
             {selectedTask && <TaskDetailModal task={selectedTask} allTasks={tasks} onClose={() => setSelectedTask(null)} onTaskUpdate={handleUpdateTask} />}
-            {viewingResultTask && <ResultModal task={viewingResultTask} onClose={() => setViewingResultTask(null)} />}
+            {viewingResultTask && (
+                <ResultModal 
+                    task={viewingResultTask} 
+                    onClose={() => setViewingResultTask(null)} 
+                    onSave={(newContent) => {
+                        if (viewingResultTask) {
+                            handleUpdateTask(viewingResultTask.id, { approvedContent: newContent });
+                             addLog(AgentName.MASTER_PLANNER, `Manually updated result for task "${viewingResultTask.title}".`);
+                        }
+                    }}
+                />
+            )}
             <LoadSessionModal 
                 isOpen={isLoadModalOpen}
                 onClose={() => setIsLoadModalOpen(false)}
