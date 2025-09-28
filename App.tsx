@@ -204,7 +204,7 @@ const App: React.FC = () => {
         try {
             if (isContentGenerationTask) {
                 addLog(task.assignedTo, `Generating content for "${task.title}"...`);
-                const content = await executeTask(task);
+                const content = await executeTask(task, userProfile);
                 
                 setTasks(currentTasks => {
                     const taskToUpdate = currentTasks.find(t => t.id === task.id);
@@ -280,7 +280,7 @@ const App: React.FC = () => {
                 processingTasks.current.delete(task.id);
             }
         }
-    }, [addLog, setTasks, setApprovals]);
+    }, [addLog, setTasks, setApprovals, userProfile]);
 
     useEffect(() => {
         const taskMap = new Map(tasks.map(t => [t.id, t]));
@@ -450,7 +450,7 @@ const App: React.FC = () => {
         setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: "Decomposing event goal..." }));
 
         try {
-            const decomposedTasks = await decomposeGoal(goal);
+            const decomposedTasks = await decomposeGoal(goal, userProfile);
             addLog(AgentName.MASTER_PLANNER, `Successfully decomposed goal into ${decomposedTasks.length} tasks.`);
             
             const initialState: AppState = {
@@ -484,7 +484,7 @@ const App: React.FC = () => {
             setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.IDLE }));
             setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: null }));
         }
-    }, [addLog, handleReset, currentUser, initialAgentStatus, initialAgentWork]);
+    }, [addLog, handleReset, currentUser, initialAgentStatus, initialAgentWork, userProfile]);
     
     useEffect(() => {
         const completedTaskIds = new Set(tasks.filter(t => t.status === TaskStatus.COMPLETED).map(t => t.id));
