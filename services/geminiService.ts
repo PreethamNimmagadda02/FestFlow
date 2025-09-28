@@ -162,19 +162,22 @@ const mockDecomposeGoal = (goal: string, userProfile: UserProfile | null): Promi
     });
 };
 
-const mockExecuteTask = (task: Task, userProfile: UserProfile | null): Promise<string> => {
-    console.log(`Executing task (Comprehensive Offline Mock): "${task.title}" for`, userProfile?.institution);
+const mockExecuteTask = (task: Task, userProfile: UserProfile | null, projectName: string | null): Promise<string> => {
+    console.log(`Executing task (Comprehensive Offline Mock): "${task.title}" for event "${projectName}" by`, userProfile?.institution);
     let mockContent = "Default mock content. If you see this, the task title might not be matched in mockExecuteTask.";
-    const institutionName = userProfile?.institution || 'FestFlow';
+    
+    const eventName = projectName || task.title; // Fallback to task title if project name is missing
+    const institutionName = userProfile?.institution || 'Our Institution';
     const institutionHandle = institutionName.replace(/\s+/g, '');
+    const eventHandle = (projectName || 'TheEvent').replace(/[^a-zA-Z0-9]/g, '');
 
     switch (task.id) {
         case "draft-sponsorship-email":
-            mockContent = `Subject: Partnership Opportunity: The Annual ${institutionName} Tech Conference
+            mockContent = `Subject: Partnership Opportunity: ${eventName}
 
 Dear [Sponsor Name],
 
-I am writing to invite you to partner with us for the upcoming ${institutionName} Tech Conference, a premier 3-day event gathering 200 industry leaders and innovators.
+I am writing to invite you to partner with us for the upcoming ${eventName}, a premier 3-day event organized by ${institutionName} gathering 200 industry leaders and innovators.
 
 We believe a partnership would offer exceptional value and exposure for your brand. Our detailed sponsorship packages are attached for your review, outlining various tiers of benefits.
 
@@ -186,22 +189,22 @@ Sponsorship Outreach Agent
 ${institutionName}`;
             break;
         case "announce-event-social-media":
-            mockContent = `🚀 BIG NEWS! Announcing the ${institutionName} Tech Conference 2024! 🤖
+            mockContent = `🚀 BIG NEWS! Announcing ${eventName}! 🤖
 
 Join us for 3 days of innovation, networking, and groundbreaking tech.
 📅 October 22-24, 2024
 📍 The Grand Expo Center
 
-Get ready to connect with 200 of the brightest minds in the industry. Early bird tickets drop next month! Don't miss out. #TechConference #Innovation #${institutionHandle}2024 #SaveTheDate`;
+Get ready to connect with 200 of the brightest minds in the industry. Early bird tickets drop next month! Don't miss out. #${eventHandle} #Innovation #${institutionHandle}2024 #SaveTheDate`;
             break;
         case "announce-keynote-speaker":
             mockContent = `🎤 Keynote Speaker Announcement! 🎤
 
-We are thrilled to announce that the legendary Dr. Evelyn Reed, a pioneer in artificial intelligence, will be our keynote speaker at the ${institutionName} Tech Conference!
+We are thrilled to announce that the legendary Dr. Evelyn Reed, a pioneer in artificial intelligence, will be our keynote speaker at ${eventName}!
 
 Get ready for an inspiring session on the future of AI and robotics. You won't want to miss this!
 
-Learn more on our new website: ${institutionHandle}Conf.com #Keynote #AI #TechEvent #${institutionHandle}2024`;
+Learn more on our new website: ${eventHandle}Conf.com #Keynote #AI #TechEvent #${eventHandle}2024`;
             break;
     }
 
@@ -262,7 +265,7 @@ export const decomposeGoal = async (goal: string, userProfile: UserProfile | nul
     }
     console.log("Decomposing goal (live):", goal);
 
-    let systemInstruction = `You are the MasterPlannerAgent for FestFlow, an AI event orchestration platform. Your role is to decompose a high-level user goal into a detailed, structured plan of tasks.
+    let systemInstruction = `You are the MasterPlannerAgent for an AI event orchestration platform. Your role is to decompose a high-level user goal into a detailed, structured plan of tasks.
 
 You have a team of specialized agents to delegate tasks to:
 - "${AgentName.LOGISTICS_COORDINATOR}": Handles physical and organizational tasks like booking venues, managing vendors, and creating schedules. These tasks are considered "manual" and will be marked as complete by the user.
@@ -375,32 +378,35 @@ Your instructions are:
  * Executes a specific content generation task using the Gemini API.
  * @param task The task to be executed.
  * @param userProfile The user's profile, containing institution details for personalization.
+ * @param projectName The name of the event, derived from the user's initial goal.
  * @returns A promise that resolves to the generated content string.
  */
-export const executeTask = async (task: Task, userProfile: UserProfile | null): Promise<string> => {
+export const executeTask = async (task: Task, userProfile: UserProfile | null, projectName: string | null): Promise<string> => {
     if (IS_OFFLINE) {
-        return mockExecuteTask(task, userProfile);
+        return mockExecuteTask(task, userProfile, projectName);
     }
     console.log(`Executing task (live): "${task.title}"`);
 
     let systemInstruction = "";
 
     if (task.assignedTo === AgentName.MARKETING) {
-        systemInstruction = `You are the ${AgentName.MARKETING} for FestFlow. Your task is to generate compelling marketing content. Be creative, engaging, and align with the event's theme.`;
+        systemInstruction = `You are the ${AgentName.MARKETING}. Your task is to generate compelling marketing content. Be creative, engaging, and align with the event's theme.`;
     } else if (task.assignedTo === AgentName.SPONSORSHIP_OUTREACH) {
-        systemInstruction = `You are the ${AgentName.SPONSORSHIP_OUTREACH} agent for FestFlow. Your task is to draft professional and persuasive outreach emails to potential sponsors. Be clear, concise, and highlight the value proposition.`;
+        systemInstruction = `You are the ${AgentName.SPONSORSHIP_OUTREACH} agent. Your task is to draft professional and persuasive outreach emails to potential sponsors. Be clear, concise, and highlight the value proposition.`;
     } else {
         return Promise.reject(new Error(`Task execution failed: The agent ${task.assignedTo} does not generate approvable content.`));
     }
     
+    let context = `\n\nIMPORTANT CONTEXT: You are generating content for an event named "${projectName || 'the event'}".`;
+    
     if (userProfile && userProfile.institution) {
-        let context = `\n\nIMPORTANT CONTEXT: You are generating content for "${userProfile.institution}"`;
+        context += ` This event is being organized by "${userProfile.institution}"`;
         if (userProfile.city && userProfile.state) {
             context += ` which is based in ${userProfile.city}, ${userProfile.state}.`;
         }
         context += ` Personalize the content to reflect this. Mention the institution's name, reference local culture if appropriate, and adopt a tone suitable for the institution (e.g., academic and vibrant for a college, professional and formal for a corporation).`;
-        systemInstruction += context;
     }
+    systemInstruction += context;
     
     // Use custom prompt if provided, otherwise construct from task details
     const prompt = task.customPrompt 
