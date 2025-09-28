@@ -15,6 +15,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { FullScreenLoader } from './components/FullScreenLoader';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { CompleteProfileModal } from './components/CompleteProfileModal';
+import { InstitutionProfile } from './components/InstitutionProfile';
 
 const ResultModal: React.FC<{ task: Task; onClose: () => void; onSave: (newContent: string) => void; }> = React.memo(({ task, onClose, onSave }) => {
     const [editableContent, setEditableContent] = useState(task.approvedContent || '');
@@ -122,6 +123,7 @@ const App: React.FC = () => {
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isDeleteCurrentModalOpen, setIsDeleteCurrentModalOpen] = useState(false);
+    const [isProfilePageOpen, setIsProfilePageOpen] = useState(false);
 
 
     useEffect(() => {
@@ -767,6 +769,7 @@ const App: React.FC = () => {
                 onUpdateProjectName={handleUpdateProjectName}
                 userProfile={userProfile}
                 isStarted={isStarted}
+                onProfileClick={() => setIsProfilePageOpen(true)}
             />
             <main className="flex-grow p-4 md:p-8 space-y-8 flex flex-col">
                 <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
@@ -828,6 +831,10 @@ const App: React.FC = () => {
                 message="Are you sure you want to permanently delete the current plan from the cloud? This action cannot be undone."
                 confirmText="Delete Forever"
                 confirmButtonClass="bg-danger hover:bg-danger/90"
+            />
+            <InstitutionProfile
+                isOpen={isProfilePageOpen}
+                onClose={() => setIsProfilePageOpen(false)}
             />
         </div>
     );
