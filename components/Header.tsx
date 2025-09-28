@@ -7,10 +7,10 @@ import { CheckCircleIcon } from './icons/CheckCircleIcon';
 import { XCircleIcon } from './icons/XCircleIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { FilePlusIcon } from './icons/FilePlusIcon';
-import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { LogOutIcon } from './icons/LogOutIcon';
 import { UserProfile } from '../types';
 import { PencilIcon } from './icons/PencilIcon';
+import { MenuIcon } from './icons/MenuIcon';
 
 interface HeaderProps {
     onResetClick: () => void;
@@ -22,6 +22,7 @@ interface HeaderProps {
     onUpdateProjectName: (newName: string) => void;
     userProfile: UserProfile | null;
     isStarted: boolean;
+    onProfileClick: () => void;
 }
 
 const AutoSaveIndicator: React.FC<{ status: HeaderProps['saveStatus'] }> = ({ status }) => {
@@ -99,7 +100,7 @@ const ProjectNameEditor: React.FC<{
     );
 };
 
-export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDeleteCurrentClick, isPlanSaved, saveStatus, onLoadClick, projectName, onUpdateProjectName, userProfile, isStarted }) => {
+export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDeleteCurrentClick, isPlanSaved, saveStatus, onLoadClick, projectName, onUpdateProjectName, userProfile, isStarted, onProfileClick }) => {
     const { currentUser, loading, login, logout } = useAuth();
     const isAuthenticated = !!currentUser;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -138,15 +139,40 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
                     <AutoSaveIndicator status={saveStatus} />
                 </div>
                 
+                {loading ? (
+                    <div className="w-9 h-9 rounded-full bg-accent animate-pulse"></div>
+                ) : currentUser ? (
+                    <button
+                        onClick={onProfileClick}
+                        className="flex items-center space-x-3 p-1 rounded-lg transition-colors hover:bg-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+                        title="View My Profile"
+                    >
+                         <div className="text-right hidden md:block">
+                            <p className="font-semibold text-sm text-light truncate max-w-[200px]">{userProfile?.institution}</p>
+                        </div>
+                         <img src={currentUser.photoURL || undefined} alt="User Profile" className="w-9 h-9 rounded-full border-2 border-highlight"/>
+                    </button>
+                ) : (
+                    <button 
+                        onClick={login}
+                        className="flex items-center space-x-2 rounded-lg bg-light px-3.5 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-opacity-90"
+                    >
+                        <GoogleIcon className="w-4 h-4" />
+                        <span>Login</span>
+                    </button>
+                )}
+
+                <div className="w-px h-6 bg-accent"></div>
+
                 <div className="relative" ref={menuRef}>
                     <button
                         onClick={() => setIsMenuOpen(prev => !prev)}
-                        className="flex items-center space-x-2 rounded-lg border-2 border-accent px-3.5 py-1.5 text-sm font-semibold text-text-secondary transition-colors hover:bg-highlight hover:text-white hover:border-highlight"
+                        className="p-2 rounded-lg border-2 border-transparent text-text-secondary transition-colors hover:bg-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight focus-visible:border-highlight"
                         aria-haspopup="true"
                         aria-expanded={isMenuOpen}
+                        aria-label="Actions menu"
                     >
-                        <span>Actions</span>
-                        <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                        <MenuIcon className="w-5 h-5" />
                     </button>
 
                     {isMenuOpen && (
@@ -205,26 +231,6 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
                         </div>
                     )}
                 </div>
-                
-                <div className="w-px h-6 bg-accent mx-1"></div>
-                {loading ? (
-                    <div className="w-9 h-9 rounded-full bg-accent animate-pulse"></div>
-                ) : currentUser ? (
-                    <div className="flex items-center space-x-3">
-                         <div className="text-right hidden md:block">
-                            <p className="font-semibold text-sm text-light truncate max-w-[200px]" title={userProfile?.institution || ''}>{userProfile?.institution}</p>
-                        </div>
-                         <img src={currentUser.photoURL || undefined} alt="User Profile" className="w-9 h-9 rounded-full border-2 border-highlight" title={userProfile?.institution || 'User Profile'}/>
-                    </div>
-                ) : (
-                    <button 
-                        onClick={login}
-                        className="flex items-center space-x-2 rounded-lg bg-light px-3.5 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-opacity-90"
-                    >
-                        <GoogleIcon className="w-4 h-4" />
-                        <span>Login</span>
-                    </button>
-                )}
             </div>
         </header>
     );
