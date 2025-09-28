@@ -772,7 +772,7 @@ const App: React.FC = () => {
                 onProfileClick={() => setIsProfilePageOpen(true)}
             />
             <main className="flex-grow p-4 md:p-8 space-y-8 flex flex-col">
-                <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} />
+                <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} isStarted={isStarted} />
                 {error && <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg animate-fadeIn">{error}</div>}
                 {isStarted && (
                     <Dashboard
