@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { AgentName, Task, TaskStatus } from "../types";
+import { AgentName, Task, TaskStatus, UserProfile } from "../types";
 
 // Set to true to use mock data and bypass the Gemini API, enabling offline use.
 const IS_OFFLINE = false;
@@ -12,7 +12,7 @@ const getAI = (): GoogleGenAI => {
     if (!ai) {
         // The API key is expected to be set as an environment variable.
         // This constructor will only be called when IS_OFFLINE is false.
-        ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY as string });
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     }
     return ai;
 };
@@ -22,8 +22,8 @@ const getAI = (): GoogleGenAI => {
  * A comprehensive mock plan to test all application features at once.
  */
 
-const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
-    console.log("Decomposing goal (Comprehensive Offline Mock):", goal);
+const mockDecomposeGoal = (goal: string, userProfile: UserProfile | null): Promise<Task[]> => {
+    console.log("Decomposing goal (Comprehensive Offline Mock):", goal, "for", userProfile?.institution);
     const mockPlan: Partial<Task>[] = [
         // --- Parent Task for Logistics ---
         {
@@ -162,17 +162,19 @@ const mockDecomposeGoal = (goal: string): Promise<Task[]> => {
     });
 };
 
-const mockExecuteTask = (task: Task): Promise<string> => {
-    console.log(`Executing task (Comprehensive Offline Mock): "${task.title}"`);
+const mockExecuteTask = (task: Task, userProfile: UserProfile | null): Promise<string> => {
+    console.log(`Executing task (Comprehensive Offline Mock): "${task.title}" for`, userProfile?.institution);
     let mockContent = "Default mock content. If you see this, the task title might not be matched in mockExecuteTask.";
+    const institutionName = userProfile?.institution || 'FestFlow';
+    const institutionHandle = institutionName.replace(/\s+/g, '');
 
     switch (task.id) {
         case "draft-sponsorship-email":
-            mockContent = `Subject: Partnership Opportunity: The Annual FestFlow Tech Conference
+            mockContent = `Subject: Partnership Opportunity: The Annual ${institutionName} Tech Conference
 
 Dear [Sponsor Name],
 
-I am writing to invite you to partner with us for the upcoming FestFlow Tech Conference, a premier 3-day event gathering 200 industry leaders and innovators.
+I am writing to invite you to partner with us for the upcoming ${institutionName} Tech Conference, a premier 3-day event gathering 200 industry leaders and innovators.
 
 We believe a partnership would offer exceptional value and exposure for your brand. Our detailed sponsorship packages are attached for your review, outlining various tiers of benefits.
 
@@ -181,25 +183,25 @@ We would be delighted to schedule a brief call to discuss this opportunity furth
 Best regards,
 
 Sponsorship Outreach Agent
-FestFlow`;
+${institutionName}`;
             break;
         case "announce-event-social-media":
-            mockContent = `🚀 BIG NEWS! Announcing the FestFlow Tech Conference 2024! 🤖
+            mockContent = `🚀 BIG NEWS! Announcing the ${institutionName} Tech Conference 2024! 🤖
 
 Join us for 3 days of innovation, networking, and groundbreaking tech.
 📅 October 22-24, 2024
 📍 The Grand Expo Center
 
-Get ready to connect with 200 of the brightest minds in the industry. Early bird tickets drop next month! Don't miss out. #TechConference #Innovation #FestFlow2024 #SaveTheDate`;
+Get ready to connect with 200 of the brightest minds in the industry. Early bird tickets drop next month! Don't miss out. #TechConference #Innovation #${institutionHandle}2024 #SaveTheDate`;
             break;
         case "announce-keynote-speaker":
             mockContent = `🎤 Keynote Speaker Announcement! 🎤
 
-We are thrilled to announce that the legendary Dr. Evelyn Reed, a pioneer in artificial intelligence, will be our keynote speaker at the FestFlow Tech Conference!
+We are thrilled to announce that the legendary Dr. Evelyn Reed, a pioneer in artificial intelligence, will be our keynote speaker at the ${institutionName} Tech Conference!
 
 Get ready for an inspiring session on the future of AI and robotics. You won't want to miss this!
 
-Learn more on our new website: FestFlowConf.com #Keynote #AI #TechEvent #FestFlow2024`;
+Learn more on our new website: ${institutionHandle}Conf.com #Keynote #AI #TechEvent #${institutionHandle}2024`;
             break;
     }
 
@@ -251,15 +253,16 @@ const callGeminiWithRetry = async (
 /**
  * Decomposes a high-level goal into a series of structured tasks using the Gemini API.
  * @param goal The user's high-level event goal.
+ * @param userProfile The user's profile, containing institution details for context.
  * @returns A promise that resolves to an array of tasks.
  */
-export const decomposeGoal = async (goal: string): Promise<Task[]> => {
+export const decomposeGoal = async (goal: string, userProfile: UserProfile | null): Promise<Task[]> => {
     if (IS_OFFLINE) {
-        return mockDecomposeGoal(goal);
+        return mockDecomposeGoal(goal, userProfile);
     }
     console.log("Decomposing goal (live):", goal);
 
-    const systemInstruction = `You are the MasterPlannerAgent for FestFlow, an AI event orchestration platform. Your role is to decompose a high-level user goal into a detailed, structured plan of tasks.
+    let systemInstruction = `You are the MasterPlannerAgent for FestFlow, an AI event orchestration platform. Your role is to decompose a high-level user goal into a detailed, structured plan of tasks.
 
 You have a team of specialized agents to delegate tasks to:
 - "${AgentName.LOGISTICS_COORDINATOR}": Handles physical and organizational tasks like booking venues, managing vendors, and creating schedules. These tasks are considered "manual" and will be marked as complete by the user.
@@ -281,6 +284,15 @@ Your instructions are:
 8.  Provide a realistic 'estimatedDuration' in days for each task. The duration should be a whole number greater than 0.
 9.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
     
+     if (userProfile && userProfile.institution) {
+        let context = `\n\nIMPORTANT CONTEXT: The user planning this event is from "${userProfile.institution}"`;
+        if (userProfile.city && userProfile.state) {
+            context += `, located in ${userProfile.city}, ${userProfile.state}.`;
+        }
+        context += " Use this information to create a more relevant and personalized plan. For example, suggest tasks that leverage local resources, mention local sponsorship opportunities, or align with the typical activities of such an institution (e.g., student-run events for a college, professional networking for a corporation).";
+        systemInstruction += context;
+    }
+
     const taskSchema = {
         type: Type.OBJECT,
         properties: {
@@ -362,11 +374,12 @@ Your instructions are:
 /**
  * Executes a specific content generation task using the Gemini API.
  * @param task The task to be executed.
+ * @param userProfile The user's profile, containing institution details for personalization.
  * @returns A promise that resolves to the generated content string.
  */
-export const executeTask = async (task: Task): Promise<string> => {
+export const executeTask = async (task: Task, userProfile: UserProfile | null): Promise<string> => {
     if (IS_OFFLINE) {
-        return mockExecuteTask(task);
+        return mockExecuteTask(task, userProfile);
     }
     console.log(`Executing task (live): "${task.title}"`);
 
@@ -380,10 +393,19 @@ export const executeTask = async (task: Task): Promise<string> => {
         return Promise.reject(new Error(`Task execution failed: The agent ${task.assignedTo} does not generate approvable content.`));
     }
     
+    if (userProfile && userProfile.institution) {
+        let context = `\n\nIMPORTANT CONTEXT: You are generating content for "${userProfile.institution}"`;
+        if (userProfile.city && userProfile.state) {
+            context += ` which is based in ${userProfile.city}, ${userProfile.state}.`;
+        }
+        context += ` Personalize the content to reflect this. Mention the institution's name, reference local culture if appropriate, and adopt a tone suitable for the institution (e.g., academic and vibrant for a college, professional and formal for a corporation).`;
+        systemInstruction += context;
+    }
+    
     // Use custom prompt if provided, otherwise construct from task details
     const prompt = task.customPrompt 
         ? task.customPrompt
-        : `Based on the following task, please generate the required content.
+        : `Generate content based on the following task:
     - Task Title: "${task.title}"
     - Task Description: "${task.description}"
     
