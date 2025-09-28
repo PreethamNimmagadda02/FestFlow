@@ -109,7 +109,7 @@ export const InstitutionProfile: React.FC<InstitutionProfileProps> = ({ isOpen, 
                 style={{animationDuration: '0.3s'}}
             >
                 <div className="p-4 border-b border-accent flex justify-between items-center flex-shrink-0">
-                    <h3 className="text-lg font-bold text-highlight">My Institution Profile</h3>
+                    <h3 className="text-lg font-bold text-highlight">Profile Page</h3>
                      <div className="flex items-center space-x-2 flex-shrink-0">
                         {!isEditing && (
                             <button onClick={handleEditClick} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-lg border-2 border-accent font-semibold text-text-secondary transition-colors hover:bg-highlight hover:text-white hover:border-highlight" title="Edit Profile">
