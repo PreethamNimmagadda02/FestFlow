@@ -72,8 +72,6 @@ The technologies for FestFlow were selected to prioritize **rapid development**,
     * Introduce user accounts and roles (e.g., Event Manager, Marketing Lead, Finance Officer).
     * Implement real-time collaboration features, allowing multiple users to work on the same event plan simultaneously.
     * Add a commenting system for tasks to facilitate team communication.
-* **Backend and Database:**
-    * Migrate from local storage to a cloud-based database like Firebase Firestore. This will enable data persistence across devices, real-time updates, and multi-user support.
 * **Event Templates:** Allow users to save successful event plans as templates for future use. This would streamline the setup process for recurring or similar events.
 
 ### Phase 5: Advanced AI and Analytics
