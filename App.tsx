@@ -204,7 +204,7 @@ const App: React.FC = () => {
         try {
             if (isContentGenerationTask) {
                 addLog(task.assignedTo, `Generating content for "${task.title}"...`);
-                const content = await executeTask(task, userProfile);
+                const content = await executeTask(task, userProfile, projectName);
                 
                 setTasks(currentTasks => {
                     const taskToUpdate = currentTasks.find(t => t.id === task.id);
@@ -280,7 +280,7 @@ const App: React.FC = () => {
                 processingTasks.current.delete(task.id);
             }
         }
-    }, [addLog, setTasks, setApprovals, userProfile]);
+    }, [addLog, setTasks, setApprovals, userProfile, projectName]);
 
     useEffect(() => {
         const taskMap = new Map(tasks.map(t => [t.id, t]));
