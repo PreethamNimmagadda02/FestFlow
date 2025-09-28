@@ -35,10 +35,11 @@ export const CompleteProfileModal: React.FC = () => {
 
     return (
         <div className="fixed inset-0 bg-primary flex flex-col items-center justify-center z-[100] p-4 text-center">
-             <div className="absolute inset-0 bg-cover bg-center bg-fixed opacity-10" 
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto.format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')" }}
-            ></div>
-             <div className="absolute inset-0 bg-gradient-to-b from-primary via-primary/80 to-primary"></div>
+             <div 
+                className="absolute inset-0 bg-cover bg-center bg-fixed" 
+                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')" }}
+            />
+            <div className="absolute inset-0 bg-primary opacity-60"></div>
             
             <div className="relative bg-secondary p-8 rounded-xl shadow-2xl border border-accent w-full max-w-lg animate-fadeIn">
                  <div className="mb-6 p-2 bg-highlight/10 rounded-full shadow-lg shadow-highlight/20 w-20 h-20 mx-auto flex items-center justify-center">
