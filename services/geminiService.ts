@@ -1,12 +1,23 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { AgentName, Task, TaskStatus, UserProfile } from "../types";
 
-// Set to true to use mock data and bypass the Gemini API, enabling offline use.
+// Set to false to use the live Gemini API. Set to true for mock data and offline use.
 const IS_OFFLINE = false;
 
 // Lazy-initialize the Google GenAI client to prevent crashes if the API key is
 // not present in an environment where the API is not being used (e.g., offline mode).
 let ai: GoogleGenAI | null = null;
+
+// The type for the structured response from the institution details endpoint.
+interface InstitutionDetails {
+    city: string;
+    state: string;
+    pincode: string;
+}
+
+// The type for the autocomplete suggestions response.
+type InstitutionSuggestions = string[];
+
 
 const getAI = (): GoogleGenAI => {
     if (!ai) {
@@ -373,6 +384,140 @@ Your instructions are:
         throw new Error("An unknown error occurred during goal decomposition.");
     }
 };
+
+const mockGetInstitutionDetails = (institutionName: string): Promise<InstitutionDetails> => {
+    console.log(`Getting details for institution (Offline Mock): "${institutionName}"`);
+    let details: InstitutionDetails = {
+        city: 'Mountain View',
+        state: 'California',
+        pincode: '94043'
+    };
+
+    if (institutionName.toLowerCase().includes('mit') || institutionName.toLowerCase().includes('massachusetts institute of technology')) {
+        details = {
+            city: 'Cambridge',
+            state: 'Massachusetts',
+            pincode: '02139'
+        };
+    } else if (institutionName.toLowerCase().includes('stanford')) {
+        details = {
+            city: 'Stanford',
+            state: 'California',
+            pincode: '94305'
+        };
+    }
+
+    return new Promise(resolve => {
+        setTimeout(() => {
+            resolve(details);
+        }, 800);
+    });
+};
+
+export const getInstitutionDetails = async (institutionName: string): Promise<InstitutionDetails> => {
+    if (IS_OFFLINE) {
+        return mockGetInstitutionDetails(institutionName);
+    }
+    console.log("Getting institution details (live):", institutionName);
+
+    // Refined instruction to ensure only the city name is returned.
+    const systemInstruction = `You are an assistant that provides location information for educational or corporate institutions. Based on the provided institution name, you must return its official city name, state/province, and pincode/zip code in JSON format. The 'city' field should contain only the official city name, excluding any neighborhoods, districts, or specific localities. If you cannot find the exact information, make the best guess or state that it could not be found within the JSON fields.`;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            city: { 
+                type: Type.STRING, 
+                // Refined description for clarity.
+                description: "The official city name where the institution is located. Exclude any neighborhoods, districts, or specific localities." 
+            },
+            state: { type: Type.STRING, description: "The state, province, or region where the institution is located." },
+            pincode: { type: Type.STRING, description: "The pincode or ZIP code for the institution's address." },
+        },
+        required: ["city", "state", "pincode"]
+    };
+
+    try {
+        const response = await callGeminiWithRetry(async () => {
+            return await getAI().models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [{ text: `Find location details for: "${institutionName}"` }] },
+                config: {
+                    systemInstruction,
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                },
+            });
+        });
+
+        const jsonStr = response.text.trim();
+        return JSON.parse(jsonStr) as InstitutionDetails;
+    } catch (e) {
+        console.error("Error getting institution details:", e);
+        if (e instanceof Error) {
+            throw new Error(`Error getting institution details:\n${e.message}`);
+        }
+        throw new Error("An unknown error occurred while fetching institution details.");
+    }
+};
+
+const mockGetInstitutionSuggestions = (query: string): Promise<InstitutionSuggestions> => {
+    console.log(`Getting suggestions for (Offline Mock): "${query}"`);
+    const allMocks = [
+        "Stanford University",
+        "Stanly Community College",
+        "Massachusetts Institute of Technology",
+        "Michigan State University",
+        "University of California, Berkeley",
+        "University of Cambridge",
+        "University of Michigan",
+    ];
+    const lowercasedQuery = query.toLowerCase();
+    const filtered = allMocks.filter(name => name.toLowerCase().includes(lowercasedQuery));
+    return new Promise(resolve => setTimeout(() => resolve(filtered), 300));
+};
+
+export const getInstitutionSuggestions = async (query: string): Promise<InstitutionSuggestions> => {
+    if (IS_OFFLINE) {
+        return mockGetInstitutionSuggestions(query);
+    }
+    console.log("Getting institution suggestions (live):", query);
+
+    const systemInstruction = `You are a highly accurate autocomplete service for educational institutions. Given a partial name, return a JSON array of up to 5 suggestions. Give strong priority to institutions located in India. The suggestions must be the standard, official full names of universities, colleges, or major academic institutions. Do not include departments, sub-schools, or street addresses. For example, if the query is "IIT", you should suggest "Indian Institute of Technology Bombay", "Indian Institute of Technology Delhi", etc. Prioritize well-known institutions. Only return the JSON array.`;
+
+    const schema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.STRING,
+            description: "The full name of a suggested institution.",
+        },
+    };
+
+    try {
+        const response = await callGeminiWithRetry(async () => {
+            return await getAI().models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [{ text: `Provide autocomplete suggestions for: "${query}"` }] },
+                config: {
+                    systemInstruction,
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                },
+            });
+        });
+
+        const jsonStr = response.text.trim();
+        return JSON.parse(jsonStr) as InstitutionSuggestions;
+
+    } catch (e) {
+        console.error("Error getting institution suggestions:", e);
+        if (e instanceof Error) {
+            throw new Error(`Error getting institution suggestions:\n${e.message}`);
+        }
+        throw new Error("An unknown error occurred while fetching institution suggestions.");
+    }
+};
+
 
 /**
  * Executes a specific content generation task using the Gemini API.
