@@ -144,7 +144,7 @@ const ProjectNameEditor: React.FC<{
 };
 
 export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDeleteCurrentClick, isPlanSaved, saveStatus, onLoadClick, projectName, onUpdateProjectName, userProfile, isStarted, onProfileClick }) => {
-    const { currentUser, loading, login, logout } = useAuth();
+    const { currentUser, loading, logout } = useAuth();
     const isAuthenticated = !!currentUser;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -188,25 +188,19 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
                     
                     {loading ? (
                         <div className="w-9 h-9 rounded-full bg-accent animate-pulse"></div>
-                    ) : currentUser ? (
-                        <button
-                            onClick={onProfileClick}
-                            className="flex items-center space-x-3 p-1 rounded-lg transition-colors hover:bg-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
-                            title="View My Profile"
-                        >
-                             <div className="text-right hidden md:block">
-                                <p className="font-semibold text-sm text-light truncate max-w-[200px]">{userProfile?.institution}</p>
-                            </div>
-                             <img src={currentUser.photoURL || undefined} alt="User Profile" className="w-9 h-9 rounded-full border-2 border-highlight"/>
-                        </button>
                     ) : (
-                        <button 
-                            onClick={login}
-                            className="flex items-center space-x-2 rounded-lg bg-light px-3.5 py-1.5 text-sm font-semibold text-primary transition-colors hover:bg-opacity-90"
-                        >
-                            <GoogleIcon className="w-4 h-4" />
-                            <span>Login</span>
-                        </button>
+                        currentUser && (
+                            <button
+                                onClick={onProfileClick}
+                                className="flex items-center space-x-3 p-1 rounded-lg transition-colors hover:bg-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+                                title="View My Profile"
+                            >
+                                <div className="text-right hidden md:block">
+                                    <p className="font-semibold text-sm text-light truncate max-w-[200px]">{userProfile?.institution}</p>
+                                </div>
+                                <img src={currentUser.photoURL || undefined} alt="User Profile" className="w-9 h-9 rounded-full border-2 border-highlight"/>
+                            </button>
+                        )
                     )}
 
                     <div className="w-px h-6 bg-accent"></div>
