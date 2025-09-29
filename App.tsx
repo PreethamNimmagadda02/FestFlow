@@ -16,17 +16,44 @@ import { CompleteProfileModal } from './components/CompleteProfileModal';
 import { InstitutionProfile } from './components/InstitutionProfile';
 
 const ResultModal: React.FC<{ task: Task; onClose: () => void; onSave: (newContent: string) => void; }> = React.memo(({ task, onClose, onSave }) => {
+    const [isEditing, setIsEditing] = useState(false);
     const [editableContent, setEditableContent] = useState(task.approvedContent || '');
+    const [isResizing, setIsResizing] = useState(false);
 
     const handleSave = () => {
         onSave(editableContent);
-        onClose(); // Close after saving
+        onClose();
+    };
+    
+    const handleCancelEdit = () => {
+        setEditableContent(task.approvedContent || '');
+        setIsEditing(false);
+    };
+
+    useEffect(() => {
+        const handleMouseUp = () => {
+            setTimeout(() => setIsResizing(false), 0);
+        };
+
+        if (isResizing) {
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
+
+    const handleBackdropClick = () => {
+        if (!isResizing) {
+            onClose();
+        }
     };
 
     return (
         <div 
             className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fadeIn"
-            onClick={onClose}
+            onClick={handleBackdropClick}
         >
             <div 
                 className="bg-secondary rounded-xl shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col border border-accent transform transition-transform duration-300 scale-95 animate-fadeIn"
@@ -34,30 +61,60 @@ const ResultModal: React.FC<{ task: Task; onClose: () => void; onSave: (newConte
                 style={{animationDuration: '0.3s'}}
             >
                 <div className="p-4 border-b border-accent flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-highlight">Edit Result: {task.title}</h3>
+                    <h3 className="text-lg font-bold text-highlight">{isEditing ? 'Edit Result' : 'View Result'}: {task.title}</h3>
                     <button onClick={onClose} className="text-text-secondary hover:text-white text-2xl">&times;</button>
                 </div>
                 <div className="p-6 overflow-y-auto">
-                     <textarea
-                        value={editableContent}
-                        onChange={(e) => setEditableContent(e.target.value)}
-                        className="w-full h-64 p-3 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light whitespace-pre-wrap font-sans text-sm"
-                        aria-label="Editable task result"
-                    />
+                     {isEditing ? (
+                        <textarea
+                            onMouseDown={() => setIsResizing(true)}
+                            value={editableContent}
+                            onChange={(e) => setEditableContent(e.target.value)}
+                            className="w-full h-64 p-3 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light whitespace-pre-wrap font-sans text-sm resize-y"
+                            aria-label="Editable task result"
+                        />
+                     ) : (
+                        <div 
+                            onMouseDown={() => setIsResizing(true)}
+                            className="w-full h-64 p-3 bg-primary border border-accent rounded-lg text-light whitespace-pre-wrap font-sans text-sm overflow-y-auto resize-y"
+                            aria-label="Task result"
+                        >
+                            {task.approvedContent || <span className="text-text-secondary italic">No content available to display.</span>}
+                        </div>
+                     )}
                 </div>
                  <div className="p-4 border-t border-accent flex justify-end items-center space-x-3">
-                    <button 
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold"
-                    >
-                        Close
-                    </button>
-                    <button 
-                        onClick={handleSave}
-                        className="px-4 py-2 rounded-lg bg-success text-white hover:opacity-90 transition-opacity font-semibold"
-                    >
-                        Save & Close
-                    </button>
+                    {isEditing ? (
+                        <>
+                            <button 
+                                onClick={handleCancelEdit}
+                                className="px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleSave}
+                                className="px-4 py-2 rounded-lg bg-success text-white hover:opacity-90 transition-opacity font-semibold"
+                            >
+                                Save & Close
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button 
+                                onClick={onClose}
+                                className="px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold"
+                            >
+                                Close
+                            </button>
+                            <button 
+                                onClick={() => setIsEditing(true)}
+                                className="px-4 py-2 rounded-lg bg-highlight text-white hover:opacity-90 transition-opacity font-semibold"
+                            >
+                                Edit Result
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
