@@ -23,7 +23,7 @@ const getAI = (): GoogleGenAI => {
     if (!ai) {
         // The API key is expected to be set as an environment variable.
         // This constructor will only be called when IS_OFFLINE is false.
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+        ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY as string });
     }
     return ai;
 };
