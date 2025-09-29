@@ -44,12 +44,17 @@ const AuthForm: React.FC = () => {
     const [password, setPassword] = useState('');
     const [authError, setAuthError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const handleAuth = async (authFn: () => Promise<void>, method: string) => {
         setIsLoading(method);
         setAuthError(null);
+        setSuccessMessage(null);
         try {
             await authFn();
+            if (method === 'email_signup') {
+                setSuccessMessage("Success! We've sent a verification link to your email. Please check your inbox.");
+            }
         } catch (error: any) {
             let friendlyMessage = "An unexpected error occurred. Please try again.";
             switch (error.code) {
@@ -66,6 +71,9 @@ const AuthForm: React.FC = () => {
                     break;
                  case 'auth/weak-password':
                     friendlyMessage = "Password is too weak. It should be at least 6 characters long.";
+                    break;
+                case 'auth/email-not-verified':
+                    friendlyMessage = "Your email has not been verified. Please check your inbox for the verification link.";
                     break;
             }
             setAuthError(friendlyMessage);
@@ -89,7 +97,7 @@ const AuthForm: React.FC = () => {
     const spinner = <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
 
     return (
-        <div className="w-full max-w-md space-y-5 animate-fadeIn" style={{ animationDelay: '300ms' }}>
+        <div className="w-full max-w-md space-y-5 opacity-0 animate-fadeIn" style={{ animationDelay: '300ms' }}>
             <div className="grid grid-cols-1 gap-4">
                  <button onClick={() => handleAuth(signInWithGoogle, 'google')} disabled={!!isLoading} className="w-full flex items-center justify-center space-x-3 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform transition-all duration-300 hover:bg-white/20 hover:border-white/30 hover:shadow-lg hover:shadow-highlight/20 hover:scale-105 active:scale-100 disabled:opacity-50">
                      {isLoading === 'google' ? spinner : <><GoogleIcon className="w-6 h-6" /> <span>Sign in with Google</span></>}
@@ -107,6 +115,7 @@ const AuthForm: React.FC = () => {
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" required className="w-full text-left p-4 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light text-base"/>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (6+ characters)" required className="w-full text-left p-4 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light text-base"/>
                 {authError && <p className="text-danger text-sm bg-danger/10 border border-danger/50 p-3 rounded-lg">{authError}</p>}
+                {successMessage && <p className="text-success text-sm bg-success/10 border border-success/50 p-3 rounded-lg">{successMessage}</p>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button onClick={handleEmailSignIn} disabled={!!isLoading || !email || !password} className="w-full flex items-center justify-center bg-highlight/20 backdrop-blur-md border border-highlight/50 text-white font-bold py-4 px-5 rounded-lg text-base transform transition-all duration-300 hover:bg-highlight/40 hover:border-highlight/70 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-highlight/40 hover:scale-105 active:scale-100">
                         {isLoading === 'email_signin' ? spinner : 'Sign In'}
@@ -145,18 +154,18 @@ const LandingHeader: React.FC = () => {
 };
 
 const Hero: React.FC = () => (
-    <section className="flex flex-col items-center justify-center pt-10 md:pt-16 pb-12 md:pb-24 animate-fadeIn max-w-4xl">
+    <section className="flex flex-col items-center justify-center pt-10 md:pt-16 pb-12 md:pb-24 opacity-0 animate-fadeIn max-w-4xl">
         <div className="mb-8 p-2 bg-highlight/10 rounded-full shadow-lg shadow-highlight/20">
             <FestFlowLogoIcon className="w-24 h-24 md:w-32 md:h-32 text-highlight" />
         </div>
-        <h2 className="text-4xl md:text-6xl font-bold text-light mb-4 tracking-tight animate-fadeIn" style={{ animationDelay: '100ms' }}>
+        <h2 className="text-4xl md:text-6xl font-bold text-light mb-4 tracking-tight opacity-0 animate-fadeIn" style={{ animationDelay: '100ms' }}>
             Don't just plan an event. <span className="text-highlight">Orchestrate it.</span>
         </h2>
-        <p className="text-lg md:text-xl text-text-secondary max-w-3xl mb-10 animate-fadeIn" style={{ animationDelay: '200ms' }}>
+        <p className="text-lg md:text-xl text-text-secondary max-w-3xl mb-10 opacity-0 animate-fadeIn" style={{ animationDelay: '200ms' }}>
              FestFlow transforms your high-level goal into a perfectly executed event. Our specialized AI agents manage every detail, from logistics to marketing, so you can focus on the big picture.
         </p>
         <AuthForm />
-        <p className="text-sm text-gray-500 mt-6 animate-fadeIn" style={{ animationDelay: '400ms' }}>No credit card required. Sign in to start planning.</p>
+        <p className="text-sm text-gray-500 mt-6 opacity-0 animate-fadeIn" style={{ animationDelay: '400ms' }}>No credit card required. Sign in to start planning.</p>
     </section>
 );
 
@@ -169,7 +178,7 @@ const TeamShowcase: React.FC = () => (
                 const agentDetail = AGENT_DETAILS[agentName];
                 const AgentIcon = agentDetail.icon;
                 return (
-                    <div key={agentName} className="bg-secondary/70 backdrop-blur-sm p-6 rounded-xl border border-accent text-left animate-fadeIn transform transition-all duration-300 hover:border-highlight/80 hover:shadow-2xl hover:shadow-highlight/20 hover:scale-105" style={{ animationDelay: `${200 + 100 * index}ms` }}>
+                    <div key={agentName} className="bg-secondary/70 backdrop-blur-sm p-6 rounded-xl border border-accent text-left opacity-0 animate-fadeIn transform transition-all duration-300 hover:border-highlight/80 hover:shadow-2xl hover:shadow-highlight/20 hover:scale-105" style={{ animationDelay: `${200 + 100 * index}ms` }}>
                         <div className="flex items-center space-x-3 mb-3">
                             <AgentIcon className={`w-8 h-8 ${agentDetail.color}`} />
                             <h4 className="text-xl font-bold text-light">{agentName}</h4>
@@ -190,7 +199,7 @@ const HowItWorks: React.FC = () => (
             {featureSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                    <div key={step.title} className="relative pl-16 pb-16 animate-fadeIn" style={{ animationDelay: `${200 + 100 * index}ms` }}>
+                    <div key={step.title} className="relative pl-16 pb-16 opacity-0 animate-fadeIn" style={{ animationDelay: `${200 + 100 * index}ms` }}>
                         <div className="absolute top-5 left-0 w-12 h-12 rounded-full bg-primary border-2 border-highlight flex items-center justify-center shadow-lg shadow-highlight/20">
                             <span className="text-xl font-bold text-highlight">{index + 1}</span>
                         </div>
@@ -232,7 +241,7 @@ const SimpleGoogleAuthButton: React.FC = () => {
     };
 
     return (
-        <div className="w-full max-w-md mx-auto space-y-4 animate-fadeIn">
+        <div className="w-full max-w-md mx-auto space-y-4 opacity-0 animate-fadeIn">
             <button 
                 onClick={handleGoogleSignIn} 
                 disabled={isLoading} 
