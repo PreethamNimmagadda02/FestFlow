@@ -40,7 +40,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+        try { // Add try block here
             if (user) {
                 const authUser: AuthUser = {
                     uid: user.uid,
@@ -58,6 +59,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 } else {
                     setIsProfileComplete(false);
                     if (!profile) {
+                        // Ensure the base profile is created if it doesn't exist
                         await updateUserProfile(user.uid, {
                             uid: user.uid,
                             email: user.email,
@@ -71,11 +73,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 setUserProfile(null);
                 setIsProfileComplete(false);
             }
+        } catch (error) { // Add catch block here
+            console.error("Auth context initialization failed:", error);
+            // In case of an error, ensure the user is logged out to prevent an infinite loading state
+            setCurrentUser(null);
+            setUserProfile(null);
+            setIsProfileComplete(false);
+        } finally { // Use finally to guarantee loading is always set to false
             setLoading(false);
-        });
+        }
+    });
 
-        return () => unsubscribe();
-    }, []);
+    return () => unsubscribe();
+}, []);
 
     /**
      * Handles authentication errors by logging them and re-throwing them.
