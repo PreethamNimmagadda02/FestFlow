@@ -5,19 +5,109 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FestFlow: AI Event Orchestration</title>
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
+    <link rel="preload" as="image" href="https://images.unsplash.com/photo-1504310578135-86561e1b1b01?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'primary': '#111827',
+              'secondary': '#1F2937',
+              'accent': '#374151',
+              'highlight': '#6366F1',
+              'light': '#F9FAFB',
+              'text-secondary': '#9CA3AF',
+              'success': '#22C55E',
+              'info': '#3B82F6',
+              'warning': '#F97316',
+              'danger': '#EF4444',
+            },
+            fontFamily: {
+              'sans': ['Space Grotesk', 'sans-serif'],
+            },
+            keyframes: {
+              pulse: {
+                '0%, 100%': { transform: 'scale(1)', opacity: 1 },
+                '50%': {  transform: 'scale(1.1)', opacity: .7 },
+              },
+              fadeIn: {
+                '0%': { opacity: 0, transform: 'translateY(15px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              shimmer: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(200%)' },
+              }
+            },
+            animation: {
+              pulse: 'pulse 1.5s ease-in-out infinite',
+              fadeIn: 'fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
+              shimmer: 'shimmer 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }
+          }
+        }
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      /* It's better to move CSS into a separate .css file, but this works for now */
-      body {
-        font-family: 'Space Grotesk', sans-serif;
-        background-color: #111827; /* primary */
-        color: #F9FAFB; /* light */
-      }
+        /* Custom scrollbar for a better dark mode experience */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1F2937;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6366F1;
+        }
+        /* Accessibility: Add a clear focus ring for keyboard navigation */
+        *:focus-visible {
+            outline: 2px solid #6366F1 !important;
+            outline-offset: 2px !important;
+            border-radius: 0.25rem !important;
+        }
+        /* Override browser autofill styles to match the dark theme */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus,
+        input:-webkit-autofill:active {
+            -webkit-box-shadow: 0 0 0 30px #111827 inset !important; /* Use theme's primary color */
+            -webkit-text-fill-color: #F9FAFB !important; /* Use theme's light text color */
+            caret-color: #F9FAFB !important; /* Ensure cursor color is also correct */
+            transition: background-color 5000s ease-in-out 0s;
+        }
     </style>
-  </head>
-  <body>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+    "react/jsx-dev-runtime": "https://esm.sh/react@18.2.0/jsx-dev-runtime",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@0.14.0",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
+    "firebase/performance": "https://www.gstatic.com/firebasejs/10.12.2/firebase-performance.js",
+    "firebase/": "https://www.gstatic.com/firebasejs/10.12.2/"
+  }
+}
+</script>
+</head>
+  <body class="bg-primary text-light font-sans">
     <div id="root"></div>
     <div id="tooltip-root"></div>
     <script type="module" src="/index.tsx"></script>
