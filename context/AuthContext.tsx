@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User, GithubAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase';
 import { getUserProfile, updateUserProfile } from '../services/firestoreService';
 import { UserProfile } from '../types';
@@ -22,7 +22,10 @@ interface AuthContextType {
     currentUser: AuthUser | null;
     userProfile: UserProfile | null;
     loading: boolean;
-    login: () => Promise<void>;
+    signInWithGoogle: () => Promise<void>;
+    signInWithGitHub: () => Promise<void>;
+    signUpWithEmail: (email: string, password: string) => Promise<void>;
+    signInWithEmail: (email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
     isProfileComplete: boolean;
     completeUserProfile: (details: ProfileDetails) => Promise<void>;
@@ -74,15 +77,54 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return () => unsubscribe();
     }, []);
 
-    const login = async () => {
+    /**
+     * Handles authentication errors by logging them and re-throwing them.
+     * Re-throwing the error is crucial as it allows the calling UI component
+     * (e.g., a login form) to catch the error and display a specific,
+     * user-friendly message based on the Firebase error code.
+     * @param error The original error object from Firebase.
+     * @param method The authentication method that failed (e.g., 'Google', 'Email').
+     */
+    const handleError = (error: any, method: string) => {
+        console.error(
+            `Authentication failed with ${method}. This might be due to an 'auth/unauthorized-domain' error for social providers. Please see the comments in 'services/firebase.ts' for instructions on how to fix this.`, 
+            error
+        );
+        // Re-throw the error so the UI layer can handle it.
+        throw error;
+    };
+
+    const signInWithGoogle = async () => {
         try {
             const provider = new GoogleAuthProvider();
             await signInWithPopup(auth, provider);
         } catch (error: any) {
-            console.error(
-                "Authentication failed. This might be due to an 'auth/unauthorized-domain' error. Please see the comments in 'services/firebase.ts' for instructions on how to fix this.", 
-                error
-            );
+            handleError(error, 'Google');
+        }
+    };
+    
+    const signInWithGitHub = async () => {
+        try {
+            const provider = new GithubAuthProvider();
+            await signInWithPopup(auth, provider);
+        } catch (error: any) {
+            handleError(error, 'GitHub');
+        }
+    };
+
+    const signUpWithEmail = async (email: string, password: string) => {
+        try {
+            await createUserWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+            handleError(error, 'Email Signup');
+        }
+    };
+
+    const signInWithEmail = async (email: string, password: string) => {
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (error: any) {
+            handleError(error, 'Email Signin');
         }
     };
 
@@ -106,7 +148,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         currentUser,
         userProfile,
         loading,
-        login,
+        signInWithGoogle,
+        signInWithGitHub,
+        signUpWithEmail,
+        signInWithEmail,
         logout,
         isProfileComplete,
         completeUserProfile,
