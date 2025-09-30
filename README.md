@@ -7,7 +7,7 @@
 
 ## Live Application Link
 
-You can view the live application here: **[https://festflow.co.in]((https://festflow.co.in))**
+You can view the live application here: **[https://festflow-805bb.web.app/](https://festflow.co.in/)**
 
 ---
 
