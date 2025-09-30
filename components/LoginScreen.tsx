@@ -315,7 +315,7 @@ export const LoginScreen: React.FC = () => {
                 setCurrentSlideIndex(prevIndex => (prevIndex + 1) % slides.length);
                 setShowText(true); // Start fade in
             }, 750); // Wait for fade out to complete before changing text
-        }, 9000); // Change slide every 9 seconds
+        }, 8000); // Change slide every 9 seconds
 
         return () => clearInterval(interval);
     }, []);
