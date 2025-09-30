@@ -3,6 +3,33 @@ import { useAuth } from '../context/AuthContext';
 import { FestFlowLogoIcon } from './icons/FestFlowLogoIcon';
 import { getInstitutionDetails, getInstitutionSuggestions } from '../services/geminiService';
 
+const backgroundSlides = [
+    {
+        imageUrl: "https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Corporate event / summit
+        animationClass: 'animate-kenburns-center',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Music festival at night
+        animationClass: 'animate-kenburns-top-left',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Large conference hall
+        animationClass: 'animate-kenburns-bottom-right',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Tech workshop
+        animationClass: 'animate-kenburns-top-left',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1556952549-7c4ac0c99272?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Elegant Gala
+        animationClass: 'animate-kenburns-bottom-right',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Outdoor cultural festival
+        animationClass: 'animate-kenburns-center',
+    },
+];
+
 export const CompleteProfileModal: React.FC = () => {
     const { completeUserProfile } = useAuth();
     const [institution, setInstitution] = useState('');
@@ -21,6 +48,15 @@ export const CompleteProfileModal: React.FC = () => {
     const debounceTimeoutRef = useRef<number | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const suggestionsCache = useRef(new Map<string, string[]>());
+    const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentSlideIndex(prevIndex => (prevIndex + 1) % backgroundSlides.length);
+        }, 9000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -111,12 +147,23 @@ export const CompleteProfileModal: React.FC = () => {
     const isFormValid = institution.trim() && city.trim() && state.trim() && pincode.trim();
 
     return (
-        <div className="fixed inset-0 bg-primary flex flex-col items-center justify-center z-[100] p-4 text-center">
-             <div 
-                className="absolute inset-0 bg-cover bg-center bg-fixed" 
-                style={{ backgroundImage: "url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')" }}
-            />
-            <div className="absolute inset-0 bg-primary opacity-60"></div>
+        <div className="fixed inset-0 flex flex-col items-center justify-center z-[100] p-4 text-center">
+             <div className="absolute inset-0">
+                {backgroundSlides.map((slide, index) => (
+                    <div 
+                        key={index}
+                        className={`absolute inset-0 bg-cover bg-center bg-fixed transition-opacity duration-1000 ease-in-out ${index === currentSlideIndex ? slide.animationClass : ''}`} 
+                        style={{ 
+                            backgroundImage: `url('${slide.imageUrl}')`,
+                            opacity: index === currentSlideIndex ? 1 : 0
+                        }}
+                    ></div>
+                ))}
+            </div>
+            <div 
+                className="absolute inset-0"
+                style={{ background: 'radial-gradient(ellipse at center, hsla(222, 47%, 11%, 0.4) 0%, hsla(222, 47%, 11%, 0.9) 80%), linear-gradient(to top, hsla(222, 47%, 11%, 0.8) 0%, transparent 50%)' }}
+            ></div>
             
             <div ref={containerRef} className="relative bg-secondary p-8 rounded-xl shadow-2xl border border-accent w-full max-w-lg animate-fadeIn">
                  <div className="mb-6 p-2 bg-highlight/10 rounded-full shadow-lg shadow-highlight/20 w-20 h-20 mx-auto flex items-center justify-center">
