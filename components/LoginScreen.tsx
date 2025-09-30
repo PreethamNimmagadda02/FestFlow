@@ -130,10 +130,10 @@ const AuthForm: React.FC = () => {
     return (
         <div className="w-full max-w-md space-y-5 opacity-0 animate-fadeIn" style={{ animationDelay: '300ms' }}>
             <div className="grid grid-cols-1 gap-4">
-                 <button onClick={() => handleAuth(signInWithGoogle, 'google')} disabled={!!isLoading} className="w-full flex items-center justify-center space-x-3 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform transition-all duration-300 hover:bg-white/20 hover:border-white/30 hover:shadow-lg hover:shadow-highlight/20 hover:scale-105 active:scale-100 disabled:opacity-50">
+                 <button onClick={() => handleAuth(signInWithGoogle, 'google')} disabled={!!isLoading} className="w-full flex items-center justify-center space-x-3 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform-gpu transition-colors transition-shadow transition-transform duration-300 hover:bg-white/20 hover:border-white/30 hover:shadow-lg hover:shadow-highlight/20 hover:scale-105 active:scale-100 disabled:opacity-50">
                      {isLoading === 'google' ? spinner : <><GoogleIcon className="w-6 h-6" /> <span>Sign in with Google</span></>}
                  </button>
-                 <button onClick={() => handleAuth(signInWithGitHub, 'github')} disabled={!!isLoading} className="w-full flex items-center justify-center space-x-3 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform transition-all duration-300 hover:bg-white/20 hover:border-white/30 hover:shadow-lg hover:shadow-highlight/20 hover:scale-105 active:scale-100 disabled:opacity-50">
+                 <button onClick={() => handleAuth(signInWithGitHub, 'github')} disabled={!!isLoading} className="w-full flex items-center justify-center space-x-3 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform-gpu transition-colors transition-shadow transition-transform duration-300 hover:bg-white/20 hover:border-white/30 hover:shadow-lg hover:shadow-highlight/20 hover:scale-105 active:scale-100 disabled:opacity-50">
                      {isLoading === 'github' ? spinner : <><GitHubIcon className="w-6 h-6" /> <span>Sign in with GitHub</span></>}
                  </button>
             </div>
@@ -148,10 +148,10 @@ const AuthForm: React.FC = () => {
                 {authError && <p className="text-danger text-sm bg-danger/10 border border-danger/50 p-3 rounded-lg">{authError}</p>}
                 {successMessage && <p className="text-success text-sm bg-success/10 border border-success/50 p-3 rounded-lg">{successMessage}</p>}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <button onClick={handleEmailSignIn} disabled={!!isLoading || !email || !password} className="w-full flex items-center justify-center bg-highlight/20 backdrop-blur-md border border-highlight/50 text-white font-bold py-4 px-5 rounded-lg text-base transform transition-all duration-300 hover:bg-highlight/40 hover:border-highlight/70 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-highlight/40 hover:scale-105 active:scale-100">
+                    <button onClick={handleEmailSignIn} disabled={!!isLoading || !email || !password} className="w-full flex items-center justify-center bg-highlight/20 backdrop-blur-md border border-highlight/50 text-white font-bold py-4 px-5 rounded-lg text-base transform-gpu transition-colors transition-shadow transition-transform duration-300 hover:bg-highlight/40 hover:border-highlight/70 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-highlight/40 hover:scale-105 active:scale-100">
                         {isLoading === 'email_signin' ? spinner : 'Sign In'}
                     </button>
-                     <button onClick={handleEmailSignUp} disabled={!!isLoading || !email || !password} className="w-full flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/20 text-text-secondary font-bold py-4 px-5 rounded-lg text-base transform transition-all duration-300 hover:bg-white/20 hover:text-white hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:scale-105 active:scale-100">
+                     <button onClick={handleEmailSignUp} disabled={!!isLoading || !email || !password} className="w-full flex items-center justify-center bg-white/10 backdrop-blur-md border border-white/20 text-text-secondary font-bold py-4 px-5 rounded-lg text-base transform-gpu transition-colors transition-shadow transition-transform duration-300 hover:bg-white/20 hover:text-white hover:border-white/30 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:scale-105 active:scale-100">
                         {isLoading === 'email_signup' ? spinner : 'Create Account'}
                     </button>
                 </div>
@@ -162,20 +162,8 @@ const AuthForm: React.FC = () => {
 
 
 const LandingHeader: React.FC = () => {
-    const [isScrolled, setIsScrolled] = useState(false);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            setIsScrolled(window.scrollY > 10);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
-        };
-    }, []);
-
     return (
-        <header className={`p-4 sticky top-0 z-40 flex items-center justify-start transition-all duration-300 ${isScrolled ? 'bg-secondary/50 backdrop-blur-lg border-b border-accent/50' : 'bg-transparent border-b border-transparent'}`}>
+        <header className="p-4 sticky top-0 z-40 flex items-center justify-start transition-all duration-300 bg-transparent border-b border-transparent">
             <div className="flex items-center space-x-3">
                 <FestFlowLogoIcon className="w-8 h-8 text-highlight" />
                 <h1 className="text-2xl font-bold tracking-wider text-light">FestFlow</h1>
@@ -280,7 +268,7 @@ const SimpleGoogleAuthButton: React.FC = () => {
             <button 
                 onClick={handleGoogleSignIn} 
                 disabled={isLoading} 
-                className="w-full flex items-center justify-center space-x-4 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform transition-all duration-200 hover:bg-white/20 hover:border-white/30 hover:scale-105 active:scale-100 disabled:opacity-50 shadow-lg"
+                className="w-full flex items-center justify-center space-x-4 py-4 px-6 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 text-light text-lg font-bold transform-gpu transition-colors transition-transform duration-200 hover:bg-white/20 hover:border-white/30 hover:scale-105 active:scale-100 disabled:opacity-50 shadow-lg"
             >
                 {isLoading ? spinner : <><GoogleIcon className="w-6 h-6" /> <span>Start Planning Now</span></>}
             </button>
@@ -315,7 +303,7 @@ export const LoginScreen: React.FC = () => {
                 setCurrentSlideIndex(prevIndex => (prevIndex + 1) % slides.length);
                 setShowText(true); // Start fade in
             }, 750); // Wait for fade out to complete before changing text
-        }, 8000); // Change slide every 9 seconds
+        }, 8000); // Change slide every 8 seconds
 
         return () => clearInterval(interval);
     }, []);
