@@ -26,6 +26,13 @@ const TrophyIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 
 const slides = [
     {
+        imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        headline: "Craft Experiences.",
+        highlight: "Not Just Events.",
+        subline: "Focus on creating an unforgettable atmosphere. Our AI handles the granular details, letting you be the creative director, not the project manager.",
+        animationClass: 'animate-kenburns-bottom-right',
+    },
+    {
         imageUrl: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
         headline: "Orchestrate Brilliance.",
         highlight: "Automate the Rest.",
@@ -38,13 +45,6 @@ const slides = [
         highlight: "Not the Spreadsheet.",
         subline: "Delegate the endless planning to a tireless team of specialist AI agents. From securing sponsors to managing vendors, they work in concert to bring your vision to life.",
         animationClass: 'animate-kenburns-top-left',
-    },
-    {
-        imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-        headline: "Craft Experiences.",
-        highlight: "Not Just Events.",
-        subline: "Focus on creating an unforgettable atmosphere. Our AI handles the granular details, letting you be the creative director, not the project manager.",
-        animationClass: 'animate-kenburns-bottom-right',
     },
      {
         imageUrl: "https://images.unsplash.com/photo-1561489396-888724a1543d?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
