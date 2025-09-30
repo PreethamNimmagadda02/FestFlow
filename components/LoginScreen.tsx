@@ -24,6 +24,37 @@ const TrophyIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.87 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.13 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
 );
 
+const slides = [
+    {
+        imageUrl: "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        headline: "Orchestrate Brilliance.",
+        highlight: "Automate the Rest.",
+        subline: "From backstage logistics to front-of-house promotion, our AI agents handle the complex details so you can focus on the creative spark.",
+        animationClass: 'animate-kenburns-center',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1505238680356-667803448bb6?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        headline: "Command the Stage.",
+        highlight: "Not the Spreadsheet.",
+        subline: "Delegate the endless planning to a tireless team of specialist AI agents. From securing sponsors to managing vendors, they work in concert to bring your vision to life.",
+        animationClass: 'animate-kenburns-top-left',
+    },
+    {
+        imageUrl: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        headline: "Craft Experiences.",
+        highlight: "Not Just Events.",
+        subline: "Focus on creating an unforgettable atmosphere. Our AI handles the granular details, letting you be the creative director, not the project manager.",
+        animationClass: 'animate-kenburns-bottom-right',
+    },
+     {
+        imageUrl: "https://images.unsplash.com/photo-1561489396-888724a1543d?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        headline: "Your Vision, Executed.",
+        highlight: "At Scale.",
+        subline: "Whether it's a corporate summit or a creative festival, FestFlow provides the intelligent orchestration needed to turn ambitious ideas into flawlessly executed realities.",
+        animationClass: 'animate-kenburns-center',
+    },
+];
+
 // --- Component Data ---
 const featureSteps = [
     { icon: IdeaIcon, title: "Define Your Goal", description: "It starts with your vision. Describe your event goal in plain language." },
@@ -153,17 +184,21 @@ const LandingHeader: React.FC = () => {
     );
 };
 
-const Hero: React.FC = () => (
+const Hero: React.FC<{ slide: (typeof slides)[0]; show: boolean }> = ({ slide, show }) => (
     <section className="flex flex-col items-center justify-center pt-10 md:pt-16 pb-12 md:pb-24 opacity-0 animate-fadeIn max-w-4xl">
         <div className="mb-8 p-2 bg-highlight/10 rounded-full shadow-lg shadow-highlight/20">
             <FestFlowLogoIcon className="w-24 h-24 md:w-32 md:h-32 text-highlight" />
         </div>
-        <h2 className="text-4xl md:text-6xl font-bold text-light mb-4 tracking-tight opacity-0 animate-fadeIn" style={{ animationDelay: '100ms' }}>
-            Don't just plan an event. <span className="text-highlight">Orchestrate it.</span>
-        </h2>
-        <p className="text-lg md:text-xl text-text-secondary max-w-3xl mb-10 opacity-0 animate-fadeIn" style={{ animationDelay: '200ms' }}>
-             FestFlow transforms your high-level goal into a perfectly executed event. Our specialized AI agents manage every detail, from logistics to marketing, so you can focus on the big picture.
-        </p>
+        
+        <div className={`transition-all duration-700 ease-in-out ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <h2 className="text-4xl md:text-6xl font-bold text-light mb-4 tracking-tight">
+                {slide.headline} <span className="text-highlight">{slide.highlight}</span>
+            </h2>
+            <p className="text-lg md:text-xl text-text-secondary max-w-3xl mb-10">
+                {slide.subline}
+            </p>
+        </div>
+
         <AuthForm />
         <p className="text-sm text-gray-500 mt-6 opacity-0 animate-fadeIn" style={{ animationDelay: '400ms' }}>No credit card required. Sign in to start planning.</p>
     </section>
@@ -199,7 +234,7 @@ const HowItWorks: React.FC = () => (
             {featureSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                    <div key={step.title} className="relative pl-16 pb-16 opacity-0 animate-fadeIn" style={{ animationDelay: `${200 + 100 * index}ms` }}>
+                    <div key={step.title} className={`relative pl-16 ${index === featureSteps.length - 1 ? '' : 'pb-16'} opacity-0 animate-fadeIn`} style={{ animationDelay: `${200 + 100 * index}ms` }}>
                         <div className="absolute top-5 left-0 w-12 h-12 rounded-full bg-primary border-2 border-highlight flex items-center justify-center shadow-lg shadow-highlight/20">
                             <span className="text-xl font-bold text-highlight">{index + 1}</span>
                         </div>
@@ -270,21 +305,45 @@ const LandingFooter: React.FC = () => (
 
 export const LoginScreen: React.FC = () => {
     const heroRef = useRef<HTMLElement>(null);
+    const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+    const [showText, setShowText] = useState(true);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setShowText(false); // Start fade out
+            setTimeout(() => {
+                setCurrentSlideIndex(prevIndex => (prevIndex + 1) % slides.length);
+                setShowText(true); // Start fade in
+            }, 750); // Wait for fade out to complete before changing text
+        }, 9000); // Change slide every 9 seconds
+
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="min-h-screen bg-transparent text-light flex flex-col overflow-x-hidden">
             <div className="fixed inset-0 z-[-1]">
+                {slides.map((slide, index) => (
+                    <div 
+                        key={index}
+                        className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ease-in-out ${index === currentSlideIndex ? slide.animationClass : ''}`} 
+                        style={{ 
+                            backgroundImage: `url('${slide.imageUrl}')`,
+                            opacity: index === currentSlideIndex ? 1 : 0
+                        }}
+                    ></div>
+                ))}
+                {/* Impactful overlay with gradient and vignette */}
                 <div 
-                    className="absolute inset-0 bg-cover bg-center bg-fixed" 
-                    style={{ backgroundImage: "url('https://images.unsplash.com/photo-1514525253161-7a46d19cd819?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D')" }}
+                    className="absolute inset-0"
+                    style={{ background: 'radial-gradient(ellipse at center, hsla(222, 47%, 11%, 0.4) 0%, hsla(222, 47%, 11%, 0.9) 80%), linear-gradient(to top, hsla(222, 47%, 11%, 0.8) 0%, transparent 50%)' }}
                 ></div>
-                <div className="absolute inset-0 bg-primary/80"></div>
             </div>
             
             <LandingHeader />
 
             <main ref={heroRef} className="flex-grow flex flex-col items-center p-4 md:p-8 text-center" style={{scrollMarginTop: '100px'}}>
-                <Hero />
+                <Hero slide={slides[currentSlideIndex]} show={showText} />
                 <TeamShowcase />
                 <HowItWorks />
                 <FinalCTA />
