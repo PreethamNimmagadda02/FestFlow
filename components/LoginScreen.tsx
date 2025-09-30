@@ -218,11 +218,13 @@ const HowItWorks: React.FC = () => (
     <section className="py-12 md:py-20 w-full max-w-4xl mx-auto">
         <h3 className="text-3xl font-bold text-light mb-16">A Simple, Powerful Flow</h3>
         <div className="relative">
-            <div className="absolute top-10 left-6 h-full w-0.5 bg-gradient-to-b from-highlight/50 via-highlight/20 to-transparent" aria-hidden="true"></div>
             {featureSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
                     <div key={step.title} className={`relative pl-16 ${index === featureSteps.length - 1 ? '' : 'pb-16'} opacity-0 animate-fadeIn`} style={{ animationDelay: `${200 + 100 * index}ms` }}>
+                        {index < featureSteps.length - 1 && (
+                            <div className="absolute top-10 left-6 h-full w-0.5 bg-accent" aria-hidden="true"></div>
+                        )}
                         <div className="absolute top-5 left-0 w-12 h-12 rounded-full bg-primary border-2 border-highlight flex items-center justify-center shadow-lg shadow-highlight/20">
                             <span className="text-xl font-bold text-highlight">{index + 1}</span>
                         </div>
