@@ -179,6 +179,7 @@ const App: React.FC = () => {
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
     const [isDeleteCurrentModalOpen, setIsDeleteCurrentModalOpen] = useState(false);
     const [isProfilePageOpen, setIsProfilePageOpen] = useState(false);
+    const generationRequestRef = useRef<number>(0);
 
 
     useEffect(() => {
@@ -458,6 +459,7 @@ const App: React.FC = () => {
     }, [tasks, agentStatus, agentWork]);
 
     const handleReset = useCallback(() => {
+        generationRequestRef.current++; // Invalidate any ongoing generation request.
         setTasks([]);
         setApprovals([]);
         setLogs([]);
@@ -498,6 +500,9 @@ const App: React.FC = () => {
             return;
         }
         handleReset();
+        
+        const currentGenerationId = generationRequestRef.current;
+
         setIsLoading(true);
         setError(null);
         setIsStarted(true);
@@ -508,6 +513,12 @@ const App: React.FC = () => {
 
         try {
             const decomposedTasks = await decomposeGoal(goal, userProfile);
+
+            if (currentGenerationId !== generationRequestRef.current) {
+                console.warn("Stale generation request ignored.");
+                return;
+            }
+
             addLog(AgentName.MASTER_PLANNER, `Successfully decomposed goal into ${decomposedTasks.length} tasks.`);
             
             const initialState: AppState = {
@@ -521,6 +532,11 @@ const App: React.FC = () => {
 
             const newSessionId = await createSession(currentUser.uid, initialState, goal);
             
+            if (currentGenerationId !== generationRequestRef.current) {
+                console.warn("Stale generation request ignored after session creation.");
+                return;
+            }
+            
             setTasks(initialState.tasks);
             setApprovals(initialState.approvals);
             setLogs(initialState.logs);
@@ -532,14 +548,20 @@ const App: React.FC = () => {
 
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-            setError(errorMessage);
-            addLog(AgentName.MASTER_PLANNER, `Error: ${errorMessage}`);
-            setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.ERROR }));
-            setIsStarted(false);
+             if (currentGenerationId === generationRequestRef.current) {
+                setError(errorMessage);
+                addLog(AgentName.MASTER_PLANNER, `Error: ${errorMessage}`);
+                setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.ERROR }));
+                setIsStarted(false);
+             } else {
+                 console.warn("Error from stale generation request ignored:", e);
+             }
         } finally {
-            setIsLoading(false);
-            setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.IDLE }));
-            setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: null }));
+            if (currentGenerationId === generationRequestRef.current) {
+                setIsLoading(false);
+                setAgentStatus(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: AgentStatus.IDLE }));
+                setAgentWork(prev => ({ ...prev, [AgentName.MASTER_PLANNER]: null }));
+            }
         }
     }, [addLog, handleReset, currentUser, initialAgentStatus, initialAgentWork, userProfile]);
     
