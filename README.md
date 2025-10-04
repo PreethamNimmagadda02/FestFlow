@@ -44,7 +44,7 @@ The application's data is modeled around a few core TypeScript interfaces, ensur
 * **Data Flow Diagram**
   <img width="867" height="693" alt="Screenshot 2025-09-26 at 11 14 06 PM" src="https://github.com/user-attachments/assets/9801aae5-ded7-491e-8377-36bb0c057ebf" />
 
-  This design ensures that each event plan is a self-contained unit, making it easy to save, load, and manage distinct events for each user.
+This design ensures that each event plan is a self-contained unit, making it easy to save, load, and manage distinct events for each user.
   
 ### Component Breakdown
 
