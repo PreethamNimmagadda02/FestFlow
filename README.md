@@ -11,7 +11,7 @@ You can view the live application here: **[https://festflow.co.in/](https://fest
 
 ---
 
-## System Design Documentation of FestFlow
+## System Design of FestFlow
 
 ### System Architecture
 
