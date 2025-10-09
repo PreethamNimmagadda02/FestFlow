@@ -108,7 +108,7 @@ The technology stack was chosen to facilitate rapid development, ensure a high-q
     * Budget tracking and expense analysis.
 * **Predictive Analysis:** In a more advanced stage, the AI could use data from past events to predict potential bottlenecks, suggest more efficient timelines, or forecast budget requirements.
 
-
+---
 
 ## Run Locally
 
@@ -119,12 +119,13 @@ The technology stack was chosen to facilitate rapid development, ensure a high-q
 2. Set the `VITE_GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-
+---
 
  ## Interaction logs
 
 Link: https://g.co/gemini/share/2168e6ca076c
 
+---
 
 ## Social Media
 <a href="https://www.linkedin.com/in/preethamnimmagadda" target="_blank">
