@@ -8,13 +8,13 @@ import { ref, deleteObject } from 'firebase/storage';
 // This configuration is populated by environment variables.
 // Ensure your build environment is set up to provide these values.
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY || "AIzaSyArseSyVsclEckvJyKk0Hy5Dmoha-Pu77M",
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN || "festflow-805bb.firebaseapp.com",
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID || "festflow-805bb",
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET || "festflow-805bb.firebasestorage.app",
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "382784963863",
-  appId: process.env.VITE_FIREBASE_APP_ID || "1:382784963863:web:b521a8a0ae8ba6004ae352",
-  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID || "G-CLPLYWPZ5K"
+  apiKey: process.env.VITE_FIREBASE_API_KEY,
+  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_FIREBASE_APP_ID,
+  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID"
 };
 
 // Initialize Firebase only if it hasn't been initialized yet.
