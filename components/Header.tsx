@@ -166,10 +166,14 @@ export const Header: React.FC<HeaderProps> = React.memo(({ onResetClick, onDelet
         <header className="bg-secondary p-3 shadow-lg flex items-center border-b border-accent h-20">
             {/* Left side container */}
             <div className="flex-1 flex justify-start">
-                <div className="flex items-center space-x-3">
+                <button
+                    onClick={onResetClick}
+                    className="flex items-center space-x-3 rounded-lg p-1 transition-colors hover:bg-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
+                    title="Start a new plan"
+                >
                     <FestFlowLogoIcon className="w-9 h-9 text-highlight" />
                     <h1 className="text-2xl font-bold tracking-wider text-light hidden md:block">FestFlow</h1>
-                </div>
+                </button>
             </div>
 
             {/* Center title container */}
