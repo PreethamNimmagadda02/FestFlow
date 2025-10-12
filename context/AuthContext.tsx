@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User, GithubAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User, GithubAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { auth, storage, deleteFileFromStorage } from '../services/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getUserProfile, updateUserProfile } from '../services/firestoreService';
 import { UserProfile } from '../types';
 
@@ -29,6 +30,9 @@ interface AuthContextType {
     logout: () => Promise<void>;
     isProfileComplete: boolean;
     completeUserProfile: (details: ProfileDetails) => Promise<void>;
+    updateUserDisplayNameAndPhoto: (data: { displayName?: string; photoURL?: string }) => Promise<void>;
+    uploadProfilePicture: (file: File) => Promise<string>;
+    uploadTaskAttachment: (file: File, taskId: string) => Promise<string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -144,6 +148,93 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsProfileComplete(true);
     };
 
+     const updateUserDisplayNameAndPhoto = async (data: { displayName?: string; photoURL?: string }) => {
+        if (!currentUser || !auth.currentUser) throw new Error("No user is logged in.");
+
+        const updates: { displayName?: string; photoURL?: string } = {};
+        if (data.displayName && data.displayName.trim() !== currentUser.displayName) {
+            updates.displayName = data.displayName.trim();
+        }
+        if (data.photoURL && data.photoURL.trim() !== currentUser.photoURL) {
+            updates.photoURL = data.photoURL.trim();
+        }
+
+        if (Object.keys(updates).length === 0) return;
+
+        // 1. Update Firebase Auth profile
+        await updateProfile(auth.currentUser, updates);
+
+        // 2. Update Firestore profile
+        await updateUserProfile(currentUser.uid, updates);
+
+        // 3. Update local state to reflect changes immediately
+        const updatedAuthUser = { ...currentUser, ...updates };
+        const updatedUserProfile = { ...userProfile, ...updates } as UserProfile;
+        
+        setCurrentUser(updatedAuthUser);
+        setUserProfile(updatedUserProfile);
+    };
+
+    const uploadProfilePicture = async (file: File): Promise<string> => {
+        if (!currentUser) throw new Error("No user is logged in.");
+
+        // Validate file type
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            throw new Error('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
+        }
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+        if (file.size > maxSize) {
+            throw new Error('File size too large. Please upload an image smaller than 5MB.');
+        }
+
+        // Delete the old profile picture if it exists and is stored in our Firebase Storage
+        const oldPhotoURL = currentUser.photoURL;
+        if (oldPhotoURL && oldPhotoURL.includes('firebasestorage.googleapis.com')) {
+            await deleteFileFromStorage(oldPhotoURL);
+        }
+
+        // Create a unique file name
+        const timestamp = Date.now();
+        const fileExtension = file.name.split('.').pop();
+        const fileName = `profile_pictures/${currentUser.uid}/${timestamp}.${fileExtension}`;
+
+        // Upload to Firebase Storage
+        const storageRef = ref(storage, fileName);
+        await uploadBytes(storageRef, file);
+
+        // Get the download URL
+        const downloadURL = await getDownloadURL(storageRef);
+
+        return downloadURL;
+    };
+
+    const uploadTaskAttachment = async (file: File, taskId: string): Promise<string> => {
+        if (!currentUser) throw new Error("No user is logged in.");
+
+        // Validate file size (max 10MB for attachments)
+        const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+        if (file.size > maxSize) {
+            throw new Error('File size too large. Please upload a file smaller than 10MB.');
+        }
+
+        // Create a unique file name
+        const timestamp = Date.now();
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const fileName = `task_attachments/${currentUser.uid}/${taskId}/${timestamp}_${sanitizedFileName}`;
+
+        // Upload to Firebase Storage
+        const storageRef = ref(storage, fileName);
+        await uploadBytes(storageRef, file);
+
+        // Get the download URL
+        const downloadURL = await getDownloadURL(storageRef);
+
+        return downloadURL;
+    };
+
     const value = {
         currentUser,
         userProfile,
@@ -155,6 +246,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         logout,
         isProfileComplete,
         completeUserProfile,
+        updateUserDisplayNameAndPhoto,
+        uploadProfilePicture,
+        uploadTaskAttachment,
     };
 
     return (
