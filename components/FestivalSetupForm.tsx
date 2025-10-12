@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CheckCircleIcon } from './icons/CheckCircleIcon';
 
 interface EventSetupFormProps {
     onSubmit: (goal: string) => void;
     isLoading: boolean;
     isStarted: boolean;
+    goalPrompt: string | null;
 }
 
-export const EventSetupForm: React.FC<EventSetupFormProps> = React.memo(({ onSubmit, isLoading, isStarted }) => {
-    const [goal, setGoal] = useState<string>('Organize a 3-day robotics competition from Oct 1-3 with 50 participants and seek 3 sponsors.');
+export const EventSetupForm: React.FC<EventSetupFormProps> = React.memo(({ onSubmit, isLoading, isStarted, goalPrompt }) => {
+    const defaultGoal = 'Organize a 3-day robotics competition from Oct 1-3 with 50 participants and seek 3 sponsors.';
+    const [goal, setGoal] = useState<string>(defaultGoal);
+
+    // This effect handles resetting the input field when a plan is reset.
+    useEffect(() => {
+        if (!isStarted) {
+            setGoal(defaultGoal);
+        }
+    }, [isStarted]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -18,6 +27,9 @@ export const EventSetupForm: React.FC<EventSetupFormProps> = React.memo(({ onSub
     };
 
     const isDisabled = isLoading || isStarted;
+    
+    // If a plan is started and we have a goalPrompt, display it. Otherwise, show the editable goal.
+    const displayValue = isStarted && goalPrompt ? goalPrompt : goal;
 
     return (
         <div className="bg-secondary p-6 rounded-xl shadow-2xl border border-accent animate-fadeIn">
@@ -25,7 +37,7 @@ export const EventSetupForm: React.FC<EventSetupFormProps> = React.memo(({ onSub
             <p className="text-text-secondary mb-4">Describe your event in one sentence. The AI agents will break it down into actionable tasks.</p>
             <form onSubmit={handleSubmit}>
                 <textarea
-                    value={goal}
+                    value={displayValue}
                     onChange={(e) => setGoal(e.target.value)}
                     placeholder="e.g., Organize a 3-day music event in December with 5 bands and a budget of $10,000."
                     className="w-full h-24 p-3 bg-primary border-2 border-accent rounded-lg focus:outline-none focus:ring-2 focus:ring-highlight transition-all text-light"
