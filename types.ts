@@ -30,7 +30,7 @@ export interface FileAttachment {
     name: string;
     type: string;
     size: number;
-    url: string; // Firebase Storage download URL
+    url: string;
 }
 
 export interface Task {
@@ -73,6 +73,12 @@ export interface AppState {
     agentWork: Record<AgentName, string | null>;
     isStarted: boolean;
 }
+
+export interface LoadedSessionState extends AppState {
+    projectName: string;
+    goalPrompt: string;
+}
+
 
 export interface SavedSession {
     id: string;
