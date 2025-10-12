@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   addDoc,
@@ -14,7 +15,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { AppState, SavedSession, UserProfile } from '../types';
+import { AppState, SavedSession, UserProfile, LoadedSessionState } from '../types';
 
 const USERS_COLLECTION = 'users';
 const SESSIONS_COLLECTION = 'sessions';
@@ -64,7 +65,7 @@ export const updateUserProfile = async (uid: string, data: Partial<UserProfile>)
  * Creates a new session document in Firestore for a user.
  * @param userUid The UID of the authenticated user.
  * @param state The initial state of the application to save.
- * @param goal The user's event goal, used as the initial session name.
+ * @param goal The user's event goal, used as the initial session name and the static goal prompt.
  * @returns The ID of the newly created session document.
  */
 export const createSession = async (userUid: string, state: AppState, goal: string): Promise<string> => {
@@ -74,6 +75,7 @@ export const createSession = async (userUid: string, state: AppState, goal: stri
         const userSessionsCollection = collection(db, USERS_COLLECTION, userUid, SESSIONS_COLLECTION);
         const docRef = await addDoc(userSessionsCollection, {
             name: goal,
+            goalPrompt: goal,
             ...sanitizedState,
             timestamp: serverTimestamp(),
             ownerId: userUid,
@@ -162,7 +164,7 @@ export const getSavedSessions = async (userUid: string): Promise<SavedSession[]>
   }
 };
 
-export const loadSessionFromFirestore = async (userUid: string, sessionId: string): Promise<AppState> => {
+export const loadSessionFromFirestore = async (userUid: string, sessionId: string): Promise<LoadedSessionState> => {
   if (!userUid) throw new Error("User is not authenticated.");
   try {
     const docRef = doc(db, USERS_COLLECTION, userUid, SESSIONS_COLLECTION, sessionId);
@@ -182,6 +184,8 @@ export const loadSessionFromFirestore = async (userUid: string, sessionId: strin
           agentStatus: data.agentStatus || {},
           agentWork: data.agentWork || {},
           isStarted: data.isStarted || false,
+          projectName: data.name || 'Untitled Plan',
+          goalPrompt: data.goalPrompt || data.name || '',
       };
     } else {
       throw new Error("No such session found!");
