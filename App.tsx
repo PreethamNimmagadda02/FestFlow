@@ -161,6 +161,7 @@ const App: React.FC = () => {
     const [isStarted, setIsStarted] = useState<boolean>(() => getInitialState('festflow_isStarted', false));
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(() => getInitialState('festflow_currentSessionId', null));
     const [projectName, setProjectName] = useState<string | null>(() => getInitialState('festflow_projectName', null));
+    const [goalPrompt, setGoalPrompt] = useState<string | null>(() => getInitialState('festflow_goalPrompt', null));
 
 
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -200,10 +201,15 @@ const App: React.FC = () => {
             } else {
                 localStorage.removeItem('festflow_projectName');
             }
+            if (goalPrompt) {
+                localStorage.setItem('festflow_goalPrompt', JSON.stringify(goalPrompt));
+            } else {
+                localStorage.removeItem('festflow_goalPrompt');
+            }
         } catch (e) {
             console.error("Failed to save state to local storage", e);
         }
-    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentSessionId, projectName]);
+    }, [tasks, approvals, logs, agentStatus, agentWork, isStarted, currentSessionId, projectName, goalPrompt]);
 
     // Auto-save effect
     useEffect(() => {
@@ -472,6 +478,7 @@ const App: React.FC = () => {
         setViewingResultTask(null);
         setCurrentSessionId(null);
         setProjectName(null);
+        setGoalPrompt(null);
         setSaveStatus('idle');
         processingTasks.current.clear();
         Object.values(progressIntervals.current).forEach(clearInterval);
@@ -485,6 +492,7 @@ const App: React.FC = () => {
         localStorage.removeItem('festflow_isStarted');
         localStorage.removeItem('festflow_currentSessionId');
         localStorage.removeItem('festflow_projectName');
+        localStorage.removeItem('festflow_goalPrompt');
 
     }, [initialAgentStatus, initialAgentWork]);
 
@@ -545,6 +553,7 @@ const App: React.FC = () => {
             setIsStarted(initialState.isStarted);
             setCurrentSessionId(newSessionId);
             setProjectName(goal);
+            setGoalPrompt(goal);
 
         } catch (e) {
             const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -702,7 +711,7 @@ const App: React.FC = () => {
         }
     }, [currentUser]);
 
-    const handleLoadState = useCallback(async (sessionId: string, sessionName: string) => {
+    const handleLoadState = useCallback(async (sessionId: string) => {
         if (!currentUser || !currentUser.uid) {
             setError('Authentication error: No user is logged in.');
             return;
@@ -711,19 +720,20 @@ const App: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const loadedState = await loadSessionFromFirestore(currentUser.uid, sessionId);
+            const loadedData = await loadSessionFromFirestore(currentUser.uid, sessionId);
             
             handleReset();
             
             setTimeout(() => {
-                setTasks(loadedState.tasks);
-                setApprovals(loadedState.approvals);
-                setLogs(loadedState.logs);
-                setAgentStatus(loadedState.agentStatus);
-                setAgentWork(loadedState.agentWork);
-                setIsStarted(loadedState.isStarted);
+                setTasks(loadedData.tasks);
+                setApprovals(loadedData.approvals);
+                setLogs(loadedData.logs);
+                setAgentStatus(loadedData.agentStatus);
+                setAgentWork(loadedData.agentWork);
+                setIsStarted(loadedData.isStarted);
                 setCurrentSessionId(sessionId);
-                setProjectName(sessionName);
+                setProjectName(loadedData.projectName);
+                setGoalPrompt(loadedData.goalPrompt);
                 addLog(AgentName.MASTER_PLANNER, `Successfully loaded session ${sessionId.slice(0,6)}...`);
                 setIsLoading(false);
             }, 100);
@@ -849,7 +859,12 @@ const App: React.FC = () => {
                 onProfileClick={() => setIsProfilePageOpen(true)}
             />
             <main className="flex-grow p-4 md:p-8 space-y-8 flex flex-col">
-                <EventSetupForm onSubmit={handleGoalSubmit} isLoading={isLoading} isStarted={isStarted} />
+                <EventSetupForm
+                    onSubmit={handleGoalSubmit}
+                    isLoading={isLoading}
+                    isStarted={isStarted}
+                    goalPrompt={goalPrompt}
+                />
                 {error && <div className="bg-danger/20 border border-danger text-red-300 p-4 rounded-lg animate-fadeIn">{error}</div>}
                 {isStarted && (
                     <Dashboard
