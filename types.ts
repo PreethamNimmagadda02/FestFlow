@@ -30,6 +30,7 @@ export interface FileAttachment {
     name: string;
     type: string;
     size: number;
+    url: string; // Firebase Storage download URL
 }
 
 export interface Task {
