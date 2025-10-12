@@ -23,7 +23,7 @@ const getAI = (): GoogleGenAI => {
     if (!ai) {
         // The API key is expected to be set as an environment variable.
         // This constructor will only be called when IS_OFFLINE is false.
-        ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY as string });
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     }
     return ai;
 };
@@ -292,6 +292,7 @@ Your instructions are:
     - A parent task's 'estimatedDuration' should be a rough sum of its sequential sub-tasks' durations.
     - **Sub-task Dependency Rule:** Sub-tasks MUST inherit all prerequisites from their parent task. Additionally, sub-tasks CAN have dependencies on other sub-tasks under the same parent to create a logical sequence.
     - **Example:** If parent "Arrange Catering" depends on "Select Venue", then its sub-task "Get Quotes" MUST also depend on "Select Venue". "Get Quotes" could ALSO depend on a sibling sub-task like "Research Caterers".
+    - **Nesting Limit:** The task hierarchy is strictly limited to one level. A task with a 'parentId' (a sub-task) CANNOT itself be a parent to another task. Do not create nested sub-tasks or 'grandchild' tasks.
 5.  Assign each task to the most appropriate agent from the list above.
 6.  Define dependencies between tasks. A task's 'dependsOn' array should contain the 'id's of all tasks that must be completed before it can start. For example, a marketing post about the venue can only be created after the venue is booked.
 7.  Generate a unique, URL-friendly slug for each task 'id'.
@@ -355,6 +356,21 @@ Your instructions are:
         const jsonStr = response.text.trim();
         const decomposedTasks = JSON.parse(jsonStr) as Task[];
         
+        // Post-processing to flatten any accidentally nested sub-tasks to enforce a single level of hierarchy.
+        const taskMapForFlattening = new Map(decomposedTasks.map(t => [t.id, t]));
+        decomposedTasks.forEach(task => {
+            // Check if this task is a sub-task
+            if (task.parentId) {
+                const parentTask = taskMapForFlattening.get(task.parentId);
+                // Check if its parent is ALSO a sub-task (which is not allowed)
+                if (parentTask && parentTask.parentId) {
+                    // This is a "grandchild". Re-parent it to the "grandparent" to flatten the structure.
+                    console.warn(`Flattening nested sub-task: "${task.title}" was moved from parent "${parentTask.title}" to "${parentTask.parentId}".`);
+                    task.parentId = parentTask.parentId;
+                }
+            }
+        });
+
         // Post-process to enforce sub-task dependency inheritance as a safeguard
         const taskMap = new Map(decomposedTasks.map(t => [t.id, t]));
         decomposedTasks.forEach(task => {
