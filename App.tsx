@@ -147,6 +147,19 @@ const getInitialState = <T,>(key: string, defaultValue: T): T => {
     return defaultValue;
 };
 
+// A helper function to find all descendants of a task.
+const getDescendantIds = (parentId: string, allTasks: Task[]): Set<string> => {
+    const descendants = new Set<string>();
+    const queue = allTasks.filter(t => t.parentId === parentId).map(t => t.id);
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        descendants.add(currentId);
+        const children = allTasks.filter(t => t.parentId === currentId);
+        children.forEach(c => queue.push(c.id));
+    }
+    return descendants;
+};
+
 
 const App: React.FC = () => {
     const { currentUser, loading, isProfileComplete, userProfile } = useAuth();
@@ -666,16 +679,60 @@ const App: React.FC = () => {
         
         addLog(newAgent, `Task "${taskToReassign.title}" has been reassigned to me. Resetting and starting work.`);
         
-        setTasks(prev => prev.map(t => 
-            t.id === taskId 
-            ? { ...t, assignedTo: newAgent, status: TaskStatus.IN_PROGRESS, progress: 0, retries: 0 } 
-            : t
-        ));
+        const descendantIds = getDescendantIds(taskId, tasks);
+        const tasksToUpdateIds = new Set([taskId, ...descendantIds]);
+        
+        if (descendantIds.size > 0) {
+            addLog(newAgent, `All sub-tasks of "${taskToReassign.title}" have also been reassigned.`);
+        }
+        
+        setTasks(prev => prev.map(t => {
+            if (tasksToUpdateIds.has(t.id)) {
+                processingTasks.current.delete(t.id);
+                // Reset main task to In Progress and sub-tasks to Pending to allow dependency re-evaluation
+                const newStatus = t.id === taskId ? TaskStatus.IN_PROGRESS : TaskStatus.PENDING;
+                return { 
+                    ...t, 
+                    assignedTo: newAgent, 
+                    status: newStatus, 
+                    progress: 0, 
+                    retries: 0 
+                };
+            }
+            return t;
+        }));
     }, [tasks, addLog]);
     
     const handleUpdateTask = useCallback((taskId: string, updates: Partial<Task>) => {
-        setTasks(prevTasks => prevTasks.map(t => t.id === taskId ? { ...t, ...updates } : t));
-    }, []);
+        setTasks(prevTasks => {
+            const taskToUpdate = prevTasks.find(t => t.id === taskId);
+            if (!taskToUpdate) return prevTasks;
+    
+            // Check if the agent is being changed
+            if (updates.assignedTo && updates.assignedTo !== taskToUpdate.assignedTo) {
+                const newAgent = updates.assignedTo;
+                addLog(newAgent, `Task "${taskToUpdate.title}" has been manually reassigned to me.`);
+    
+                const descendantIds = getDescendantIds(taskId, prevTasks);
+                if (descendantIds.size > 0) {
+                     addLog(newAgent, `Propagating agent change to ${descendantIds.size} sub-task(s).`);
+                }
+                
+                return prevTasks.map(t => {
+                    if (t.id === taskId) {
+                        return { ...t, ...updates }; // Apply all updates to the main task
+                    }
+                    if (descendantIds.has(t.id)) {
+                        return { ...t, assignedTo: newAgent }; // Only update agent for descendants
+                    }
+                    return t;
+                });
+            }
+    
+            // If no agent change, just apply the updates to the single task
+            return prevTasks.map(t => (t.id === taskId ? { ...t, ...updates } : t));
+        });
+    }, [addLog]);
 
     const handleGanttSaveChanges = useCallback((orderedTasks: Task[]) => {
         addLog(AgentName.MASTER_PLANNER, "Timeline saved. Resetting all tasks and clearing previous results to start the new plan from a clean slate.");
