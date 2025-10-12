@@ -21,10 +21,6 @@ const backgroundSlides = [
         animationClass: 'animate-kenburns-top-left',
     },
     {
-        imageUrl: "https://images.unsplash.com/photo-1556952549-7c4ac0c99272?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Elegant Gala
-        animationClass: 'animate-kenburns-bottom-right',
-    },
-    {
         imageUrl: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Outdoor cultural festival
         animationClass: 'animate-kenburns-center',
     },
