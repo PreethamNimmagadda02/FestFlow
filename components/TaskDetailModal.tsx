@@ -7,6 +7,8 @@ import { PaperclipIcon } from './icons/PaperclipIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { FileIcon } from './icons/FileIcon';
 import { PencilIcon } from './icons/PencilIcon';
+import { useAuth } from '../context/AuthContext';
+import { deleteFileFromStorage } from '../services/firebase';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -25,8 +27,11 @@ const formatBytes = (bytes: number, decimals = 2): string => {
 };
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ task, allTasks, onClose, onTaskUpdate }) => {
+    const { uploadTaskAttachment } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [editedTask, setEditedTask] = useState<Task>(task);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
 
     useEffect(() => {
         setEditedTask(task);
@@ -120,7 +125,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
     }, [task.id, allTasks]);
 
     const allPrerequisites = useMemo(() => {
-        const taskMap = new Map(allTasks.map(t => [t.id, t]));
+        const taskMap = new Map<string, Task>(allTasks.map(t => [t.id, t]));
         const prerequisites = new Map<string, Task>();
         const queue = [...(task.dependsOn || [])];
         const visited = new Set(queue);
@@ -143,23 +148,64 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
         return Array.from(prerequisites.values());
     }, [task.dependsOn, allTasks]);
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files.length > 0) {
             const file = event.target.files[0];
-            const newAttachment: FileAttachment = {
-                id: `file-${Date.now()}`,
-                name: file.name,
-                type: file.type,
-                size: file.size,
-            };
-            const updatedAttachments = [...(task.attachments || []), newAttachment];
+            setIsUploading(true);
+            setUploadError(null);
+
+            try {
+                // Upload file to Firebase Storage
+                const downloadURL = await uploadTaskAttachment(file, task.id);
+
+                // Create attachment with URL
+                const newAttachment: FileAttachment = {
+                    id: `file-${Date.now()}`,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    url: downloadURL,
+                };
+                
+                const updatedAttachments = [...(task.attachments || []), newAttachment];
+                onTaskUpdate(task.id, { attachments: updatedAttachments });
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
+                setUploadError(errorMessage);
+                console.error('Error uploading file:', error);
+            } finally {
+                setIsUploading(false);
+                // Reset the input so the same file can be uploaded again if needed
+                event.target.value = '';
+            }
+        }
+    };
+
+    const handleRemoveAttachment = async (fileId: string, fileUrl: string) => {
+        try {
+            // Delete from Firebase Storage
+            await deleteFileFromStorage(fileUrl);
+            
+            // Update task attachments
+            const updatedAttachments = (task.attachments || []).filter(f => f.id !== fileId);
+            onTaskUpdate(task.id, { attachments: updatedAttachments });
+        } catch (error) {
+            console.error('Error deleting attachment:', error);
+            // Still remove from UI even if deletion fails
+            const updatedAttachments = (task.attachments || []).filter(f => f.id !== fileId);
             onTaskUpdate(task.id, { attachments: updatedAttachments });
         }
     };
 
-    const handleRemoveAttachment = (fileId: string) => {
-        const updatedAttachments = (task.attachments || []).filter(f => f.id !== fileId);
-        onTaskUpdate(task.id, { attachments: updatedAttachments });
+    const handleDownloadAttachment = (url: string, fileName: string) => {
+        // Open in new tab for download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -313,27 +359,49 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = React.memo(({ tas
                      <div>
                         <h4 className="text-sm font-semibold text-text-secondary mb-2">Attachments</h4>
                         <div className="bg-primary p-3 rounded-lg border border-accent space-y-3">
-                            {(!task.attachments || task.attachments.length === 0) && (
+                            {(!task.attachments || task.attachments.length === 0) && !isUploading && (
                                 <p className="text-text-secondary text-sm text-center py-2">No files attached.</p>
+                            )}
+                            {isUploading && (
+                                <div className="flex items-center justify-center space-x-2 py-2">
+                                    <svg className="animate-spin h-5 w-5 text-highlight" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span className="text-text-secondary text-sm">Uploading...</span>
+                                </div>
+                            )}
+                            {uploadError && (
+                                <p className="text-danger text-sm text-center py-2">{uploadError}</p>
                             )}
                             <ul className="space-y-2">
                                 {(task.attachments || []).map(file => (
                                     <li key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded-md text-sm group">
-                                        <div className="flex items-center space-x-3 truncate">
+                                        <div className="flex items-center space-x-3 truncate flex-1">
                                             <FileIcon className="w-5 h-5 text-text-secondary flex-shrink-0" />
-                                            <span className="text-light truncate">{file.name}</span>
+                                            <button 
+                                                onClick={() => handleDownloadAttachment(file.url, file.name)}
+                                                className="text-light truncate hover:text-highlight transition-colors text-left"
+                                                title="Click to download"
+                                            >
+                                                {file.name}
+                                            </button>
                                             <span className="text-text-secondary flex-shrink-0">({formatBytes(file.size)})</span>
                                         </div>
-                                        <button onClick={() => handleRemoveAttachment(file.id)} className="text-text-secondary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => handleRemoveAttachment(file.id, file.url)} 
+                                            className="text-text-secondary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0"
+                                            title="Delete attachment"
+                                        >
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </li>
                                 ))}
                             </ul>
-                             <label className="w-full mt-2 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold cursor-pointer text-sm">
+                             <label className={`w-full mt-2 flex items-center justify-center space-x-2 px-4 py-2 rounded-lg bg-accent text-light transition-opacity font-semibold text-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/80 cursor-pointer'}`}>
                                 <PaperclipIcon className="w-4 h-4" />
-                                <span>Add Attachment</span>
-                                <input type="file" className="hidden" onChange={handleFileChange} />
+                                <span>{isUploading ? 'Uploading...' : 'Add Attachment'}</span>
+                                <input type="file" className="hidden" onChange={handleFileChange} disabled={isUploading} />
                             </label>
                         </div>
                     </div>
