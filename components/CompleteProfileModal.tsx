@@ -5,23 +5,23 @@ import { getInstitutionDetails, getInstitutionSuggestions } from '../services/ge
 
 const backgroundSlides = [
     {
-        imageUrl: "https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Corporate event / summit
+        imageUrl: "https://images.unsplash.com/photo-1543269865-cbf427effbad?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D3%D3", // Corporate event / summit
         animationClass: 'animate-kenburns-center',
     },
     {
-        imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Music festival at night
+        imageUrl: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D3%D3", // Music festival at night
         animationClass: 'animate-kenburns-top-left',
     },
     {
-        imageUrl: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Large conference hall
+        imageUrl: "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D3%D3", // Large conference hall
         animationClass: 'animate-kenburns-bottom-right',
     },
     {
-        imageUrl: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Tech workshop
+        imageUrl: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D3%D3", // Tech workshop
         animationClass: 'animate-kenburns-top-left',
     },
     {
-        imageUrl: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Outdoor cultural festival
+        imageUrl: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?q=80&w=3000&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%D3%D3", // Outdoor cultural festival
         animationClass: 'animate-kenburns-center',
     },
 ];
@@ -145,6 +145,12 @@ export const CompleteProfileModal: React.FC = () => {
     return (
         <div className="fixed inset-0 flex flex-col items-center justify-center z-[100] p-4 text-center">
              <div className="absolute inset-0">
+                {/* Static backdrop matching the current slide */}
+                <div 
+                    className="absolute inset-0 bg-cover bg-center bg-fixed"
+                    style={{ backgroundImage: `url('${backgroundSlides[currentSlideIndex].imageUrl}')`}}
+                ></div>
+                {/* Slideshow with cross-fade and animation */}
                 {backgroundSlides.map((slide, index) => (
                     <div 
                         key={index}
