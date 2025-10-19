@@ -1,9 +1,10 @@
-const CACHE_NAME = 'festflow-cache-v1';
+const CACHE_NAME = 'festflow-cache-v2';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/vite.svg'
+  '/icon-192.svg',
+  '/icon-512.svg'
 ];
 
 self.addEventListener('install', event => {
@@ -23,6 +24,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         cacheNames.map(cacheName => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Service Worker: Deleting old cache', cacheName);
             return caches.delete(cacheName);
           }
         })
