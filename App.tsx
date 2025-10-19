@@ -195,6 +195,19 @@ const App: React.FC = () => {
     const [isProfilePageOpen, setIsProfilePageOpen] = useState(false);
     const generationRequestRef = useRef<number>(0);
 
+    useEffect(() => {
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) {
+            if (currentUser) {
+                // Main app view - match the header color ('secondary')
+                themeColorMeta.setAttribute('content', '#1F2937');
+            } else {
+                // Login screen view - match the primary background color to blend with the overlay
+                themeColorMeta.setAttribute('content', '#111827');
+            }
+        }
+    }, [currentUser]);
+
 
     useEffect(() => {
         try {
