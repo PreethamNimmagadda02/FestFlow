@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Allow users to upload profile pictures only to their own directory
+    match /profile_pictures/{userId}/{fileName} {
+      // Allow read access to all authenticated users
+      allow read: if request.auth != null;
+      
+      // Allow write access only if the user is authenticated and uploading to their own directory
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024  // 5MB max
+                   && request.resource.contentType.matches('image/(jpeg|jpg|png|gif|webp)');
+      
+      // Allow users to delete their own profile pictures
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow users to upload task attachments to their own directory
+    match /task_attachments/{userId}/{taskId}/{fileName} {
+      // Allow read access to all authenticated users
+      allow read: if request.auth != null;
+      
+      // Allow write access only if the user is authenticated and uploading to their own directory
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024;  // 10MB max for task attachments
+      
+      // Allow users to delete their own task attachments
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Deny all other access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
