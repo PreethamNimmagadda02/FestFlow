@@ -14,64 +14,7 @@
     <link rel="preload" as="image" href="https://images.unsplash.com/photo-1505238680356-667803448bb6?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
     <link rel="preload" as="image" href="https://images.unsplash.com/photo-1561489396-888724a1543d?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
     <link rel="preload" as="image" href="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?q=80&w=2400&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'primary': '#111827',
-              'secondary': '#1F2937',
-              'accent': '#374151',
-              'highlight': '#6366F1',
-              'light': '#F9FAFB',
-              'text-secondary': '#9CA3AF',
-              'success': '#22C55E',
-              'info': '#3B82F6',
-              'warning': '#F97316',
-              'danger': '#EF4444',
-            },
-            fontFamily: {
-              'sans': ['Space Grotesk', 'sans-serif'],
-            },
-            keyframes: {
-              pulse: {
-                '0%, 100%': { transform: 'scale(1)', opacity: 1 },
-                '50%': {  transform: 'scale(1.1)', opacity: .7 },
-              },
-              fadeIn: {
-                '0%': { opacity: 0, transform: 'translateY(15px)' },
-                '100%': { opacity: 1, transform: 'translateY(0)' },
-              },
-              shimmer: {
-                '0%': { transform: 'translateX(0)' },
-                '100%': { transform: 'translateX(200%)' },
-              },
-              'kenburns-top-left': {
-                  '0%': { transform: 'scale(1) translate(0, 0)', transformOrigin: 'top left' },
-                  '100%': { transform: 'scale(1.15) translate(5%, 5%)', transformOrigin: 'top left' }
-              },
-              'kenburns-bottom-right': {
-                  '0%': { transform: 'scale(1) translate(0, 0)', transformOrigin: 'bottom right' },
-                  '100%': { transform: 'scale(1.15) translate(-5%, -5%)', transformOrigin: 'bottom right' }
-              },
-              'kenburns-center': {
-                  '0%': { transform: 'scale(1)', transformOrigin: 'center center' },
-                  '100%': { transform: 'scale(1.15)', transformOrigin: 'center center' }
-              }
-            },
-            animation: {
-              pulse: 'pulse 1.5s ease-in-out infinite',
-              fadeIn: 'fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards',
-              shimmer: 'shimmer 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'kenburns-top-left': 'kenburns-top-left 11s ease-out both',
-              'kenburns-bottom-right': 'kenburns-bottom-right 11s ease-out both',
-              'kenburns-center': 'kenburns-center 11s ease-out both',
-            }
-          }
-        }
-      }
-    </script>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">

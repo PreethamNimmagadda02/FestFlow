@@ -8,19 +8,19 @@ import { ClockIcon } from './icons/ClockIcon';
 
 // A simple date utility library to avoid external dependencies
 const dateUtils = {
-  addDays: (date: Date, days: number): Date => {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-  },
-  getDaysBetween: (startDate: Date, endDate: Date): number => {
-    const oneDay = 24 * 60 * 60 * 1000;
-    // We want the number of days inclusive. e.g., Jan 1 to Jan 2 is 2 days.
-    // We also need to account for timezone offsets by using UTC dates for calculation
-    const start = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()));
-    const end = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()));
-    return Math.round((end.getTime() - start.getTime()) / oneDay) + 1;
-  },
+    addDays: (date: Date, days: number): Date => {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result;
+    },
+    getDaysBetween: (startDate: Date, endDate: Date): number => {
+        const oneDay = 24 * 60 * 60 * 1000;
+        // We want the number of days inclusive. e.g., Jan 1 to Jan 2 is 2 days.
+        // We also need to account for timezone offsets by using UTC dates for calculation
+        const start = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()));
+        const end = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()));
+        return Math.round((end.getTime() - start.getTime()) / oneDay) + 1;
+    },
 };
 
 interface GanttChartProps {
@@ -70,11 +70,11 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
     let processedCount = 0;
     while (queue.length > 0) {
         const taskId = queue.shift()!;
-        
+
         if (ganttTaskMap.has(taskId)) continue;
 
         const task = taskMap.get(taskId)!;
-        
+
         let ganttStartDate: Date;
         if (task.startDate) {
             ganttStartDate = new Date(task.startDate);
@@ -103,7 +103,7 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
         for (const childId of children) {
             const currentInDegree = inDegree.get(childId)!;
             inDegree.set(childId, currentInDegree - 1);
-            
+
             if (inDegree.get(childId) === 0 && !taskMap.get(childId)?.startDate) {
                 queue.push(childId);
             }
@@ -111,18 +111,34 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
     }
 
     if (processedCount < tasks.length) {
-        console.warn("Circular dependency detected. Assigning fallback dates to un-processed tasks.");
-        tasks.forEach(task => {
-            if (!ganttTaskMap.has(task.id)) {
-                console.warn(`- Task in cycle: ${task.title} (${task.id})`);
-                const ganttStartDate = task.startDate ? new Date(task.startDate) : projectStartDate;
-                const duration = Math.max(1, task.estimatedDuration || 1);
-                const ganttEndDate = dateUtils.addDays(ganttStartDate, duration - 1);
-                ganttTaskMap.set(task.id, { ...task, ganttStartDate, ganttEndDate, level: 0 });
+        console.warn("Circular dependency detected. Breaking cycles to render.");
+        // Identify remaining tasks (those involved in cycles)
+        const remainingTasks = tasks.filter(t => !ganttTaskMap.has(t.id));
+
+        remainingTasks.forEach(task => {
+            // For each remaining task, try to calculate a date ignoring dependencies that are not yet processed
+            // This effectively breaks the cycle by treating the cyclic dependency as non-existent for date calculation
+            let ganttStartDate = projectStartDate;
+
+            // Try to find ANY valid parent dependency to anchor to
+            if (task.dependsOn) {
+                const validDepEndDates = task.dependsOn
+                    .map(id => ganttTaskMap.get(id)?.ganttEndDate)
+                    .filter((d): d is Date => !!d);
+
+                if (validDepEndDates.length > 0) {
+                    const maxEndDate = new Date(Math.max(...validDepEndDates.map(d => d.getTime())));
+                    ganttStartDate = dateUtils.addDays(maxEndDate, 1);
+                }
             }
+
+            const duration = Math.max(1, task.estimatedDuration || 1);
+            const ganttEndDate = dateUtils.addDays(ganttStartDate, duration - 1);
+
+            ganttTaskMap.set(task.id, { ...task, ganttStartDate, ganttEndDate, level: 0 });
         });
     }
-    
+
     // Second pass to adjust parent task dates to be containers for their children
     const parentChildMap = new Map<string, string[]>();
     tasks.forEach(task => {
@@ -142,9 +158,18 @@ const calculateTaskDates = (tasks: Task[], projectStartDate: Date): GanttTask[] 
             if (childrenGanttTasks.length > 0) {
                 const childStartTimes = childrenGanttTasks.map(c => c.ganttStartDate.getTime());
                 const childEndTimes = childrenGanttTasks.map(c => c.ganttEndDate.getTime());
-                
+
                 parentGanttTask.ganttStartDate = new Date(Math.min(...childStartTimes));
                 parentGanttTask.ganttEndDate = new Date(Math.max(...childEndTimes));
+
+                // Calculate weighted progress for parent task
+                const totalProgress = childrenGanttTasks.reduce((sum, child) => {
+                    const childProgress = child.status === TaskStatus.COMPLETED ? 100 : (child.progress || 0);
+                    return sum + childProgress;
+                }, 0);
+
+                // Assign calculated progress to parent
+                parentGanttTask.progress = Math.round(totalProgress / childrenGanttTasks.length);
             }
         }
     });
@@ -209,33 +234,33 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     const { ganttTasks, chartStartDate, totalDays, projectStartDate, parentIds } = useMemo(() => {
         if (tasks.length === 0) {
             const today = new Date();
-            today.setHours(0,0,0,0);
+            today.setHours(0, 0, 0, 0);
             return {
                 ganttTasks: [], chartStartDate: today,
                 totalDays: 35, projectStartDate: today,
                 parentIds: new Set<string>(),
             };
         }
-        
+
         const allStartDates = tasks.map(t => new Date(t.startDate || new Date()));
         const earliestDate = allStartDates.length > 0 ? new Date(Math.min(...allStartDates.map(d => d.getTime()))) : new Date();
-        earliestDate.setHours(0,0,0,0);
+        earliestDate.setHours(0, 0, 0, 0);
 
         const calculatedGanttTasks = calculateTaskDates(orderedTasks, earliestDate);
-        
+
         const startDates = calculatedGanttTasks.map(t => t.ganttStartDate);
         const endDates = calculatedGanttTasks.map(t => t.ganttEndDate);
 
         const projectStartDate = startDates.length > 0 ? new Date(Math.min(...startDates.map(d => d.getTime()))) : earliestDate;
         const maxDate = endDates.length > 0 ? new Date(Math.max(...endDates.map(d => d.getTime()))) : earliestDate;
-        
+
         const chartStartDate = projectStartDate;
         const chartEndDate = maxDate;
         let totalDays = calculatedGanttTasks.length > 0 ? dateUtils.getDaysBetween(chartStartDate, chartEndDate) : 35;
         totalDays = Math.max(totalDays, 35);
 
         const parentIds = new Set(orderedTasks.map(t => t.parentId).filter((id): id is string => !!id));
-        
+
         return { ganttTasks: calculatedGanttTasks, chartStartDate, totalDays, projectStartDate, parentIds };
     }, [orderedTasks, tasks]);
 
@@ -250,30 +275,30 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             setTooltipPosition({ visibility: 'hidden', opacity: 0 });
             return;
         }
-    
+
         const tooltipEl = tooltipRef.current;
         const taskRect = tooltipData.targetRect;
         const tooltipRect = tooltipEl.getBoundingClientRect();
-    
+
         if (tooltipRect.width === 0 || tooltipRect.height === 0) {
             return;
         }
-    
+
         const vpWidth = window.innerWidth;
         const vpHeight = window.innerHeight;
         const OFFSET = 15; // Increased offset for more spacing
-    
+
         // Default to position above the task
         let top = taskRect.top - tooltipRect.height - OFFSET;
-    
+
         // If it goes off-screen at the top, flip it to be below the task
         if (top < OFFSET) {
             top = taskRect.bottom + OFFSET;
         }
-    
+
         // Center horizontally relative to the task
         let left = taskRect.left + (taskRect.width / 2) - (tooltipRect.width / 2);
-    
+
         // Adjust horizontal position to keep it inside the viewport
         if (left < OFFSET) {
             left = OFFSET;
@@ -281,7 +306,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         if (left + tooltipRect.width > vpWidth - OFFSET) {
             left = vpWidth - tooltipRect.width - OFFSET;
         }
-    
+
         // Final check: if it's *still* off-screen vertically (e.g., small screens), center it.
         if (top < OFFSET || top + tooltipRect.height > vpHeight - OFFSET) {
             setTooltipPosition({
@@ -309,7 +334,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             return updateFn(currentTasks);
         });
     };
-    
+
     const handleUndo = () => {
         if (history.length > 0) {
             const lastState = history[history.length - 1];
@@ -317,7 +342,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             setHistory(prevHistory => prevHistory.slice(0, -1));
         }
     };
-    
+
     const getAllPrerequisites = (taskId: string, allTasks: Task[]): string[] => {
         const taskMap = new Map(allTasks.map(t => [t.id, t]));
         const prerequisites = new Set<string>();
@@ -327,10 +352,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         if (!startTask) return [];
 
         const processingQueue = [...(startTask.dependsOn || [])];
-        
-        while(processingQueue.length > 0) {
+
+        while (processingQueue.length > 0) {
             const currentDepId = processingQueue.shift()!;
-            
+
             if (visitedInThisTraversal.has(currentDepId)) continue;
             visitedInThisTraversal.add(currentDepId);
 
@@ -404,7 +429,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         const taskMap = new Map(tasks.map(t => [t.id, t]));
         const visited = new Set<string>();
         const queue = [fromId];
-    
+
         while (queue.length > 0) {
             const currentId = queue.shift()!;
             const currentTask = taskMap.get(currentId);
@@ -426,31 +451,31 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         e.stopPropagation();
         const draggedTaskId = e.dataTransfer.getData('taskId');
         if (!isEditing || !draggedTaskId || draggedTaskId === targetTask.id) return;
-    
+
         updateTasksAndStoreHistory(currentTasks => {
             const pathExists = hasPath(targetTask.id, draggedTaskId, currentTasks);
-    
+
             if (pathExists) {
                 const draggedDependencies = currentTasks.find(t => t.id === draggedTaskId)?.dependsOn || [];
-                
+
                 return currentTasks.map(task => {
                     if (task.id === targetTask.id) {
                         return { ...task, dependsOn: draggedDependencies, startDate: undefined };
                     }
                     return task;
                 });
-    
+
             } else {
                 const newTasks = [...currentTasks];
                 const draggedTaskIndex = newTasks.findIndex(t => t.id === draggedTaskId);
-    
+
                 if (draggedTaskIndex === -1) return currentTasks;
-    
+
                 const draggedTask = { ...newTasks[draggedTaskIndex] };
                 draggedTask.dependsOn = Array.from(new Set([...(draggedTask.dependsOn || []), targetTask.id]));
                 draggedTask.startDate = undefined;
                 newTasks[draggedTaskIndex] = draggedTask;
-                
+
                 const targetTaskIndex = newTasks.findIndex(t => t.id === targetTask.id);
                 if (targetTaskIndex !== -1) {
                     const newTargetTask = { ...newTasks[targetTaskIndex] };
@@ -459,7 +484,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                         newTasks[targetTaskIndex] = newTargetTask;
                     }
                 }
-    
+
                 return newTasks;
             }
         });
@@ -473,20 +498,20 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
 
         const gridRect = ganttGridRef.current.getBoundingClientRect();
         const dropX = e.clientX - gridRect.left + ganttGridRef.current.scrollLeft;
-        
+
         const adjustedDropX = dropX - dragOffsetX;
-        
+
         const dayWidth = 64;
-        
+
         const dayIndex = Math.round(adjustedDropX / dayWidth);
         const newStartDate = dateUtils.addDays(chartStartDate, dayIndex);
-        
-        updateTasksAndStoreHistory(currentTasks => 
+
+        updateTasksAndStoreHistory(currentTasks =>
             currentTasks.map(task => {
                 if (task.id === draggedTaskId) {
                     const newDependsOn = task.dependsOn?.filter(depId => {
-                         const depGanttTask = ganttTasksMap.get(depId);
-                         return depGanttTask && depGanttTask.ganttEndDate < newStartDate;
+                        const depGanttTask = ganttTasksMap.get(depId);
+                        return depGanttTask && depGanttTask.ganttEndDate < newStartDate;
                     });
                     return { ...task, startDate: newStartDate.toISOString().split('T')[0], dependsOn: newDependsOn };
                 }
@@ -499,29 +524,29 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         e.preventDefault();
         const draggedTaskId = e.dataTransfer.getData('taskId');
         if (!isEditing || !draggedTaskId || !dropIndicator) return;
-        
+
         updateTasksAndStoreHistory(currentTasks => {
             const draggedTaskIndex = currentTasks.findIndex(t => t.id === draggedTaskId);
             if (draggedTaskIndex === -1) return currentTasks;
-    
+
             const reorderedTasks = [...currentTasks];
             const [removed] = reorderedTasks.splice(draggedTaskIndex, 1);
             reorderedTasks.splice(dropIndicator.index, 0, removed);
-            
+
             return reorderedTasks.map((task, newIndex) => {
                 if (!task.dependsOn || task.dependsOn.length === 0) {
                     return task;
                 }
-    
+
                 const validDependencies = task.dependsOn.filter(depId => {
                     const prerequisiteIndex = reorderedTasks.findIndex(t => t.id === depId);
                     return prerequisiteIndex !== -1 && prerequisiteIndex < newIndex;
                 });
-    
+
                 if (validDependencies.length !== task.dependsOn.length) {
                     return { ...task, dependsOn: validDependencies };
                 }
-    
+
                 return task;
             });
         });
@@ -531,12 +556,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
     const handleSidebarDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         if (!isEditing || !sidebarRef.current) return;
-        
+
         const sidebarRect = sidebarRef.current.getBoundingClientRect();
         const offsetY = e.clientY - sidebarRect.top;
         const dropIndex = Math.max(0, Math.min(orderedTasks.length, Math.round(offsetY / 48)));
         const yPos = dropIndex * 48;
-        
+
         setDropIndicator({ index: dropIndex, y: yPos });
     };
 
@@ -558,7 +583,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
             </div>
         );
     }
-    
+
     const tooltipPortal = createPortal(
         <div
             ref={tooltipRef}
@@ -590,8 +615,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                             <ul className="list-disc list-inside text-sm text-light space-y-1 max-h-24 overflow-y-auto">
                                 {tooltipData.content.subTasks.map((sub, i) => (
                                     <li key={i} className="truncate flex items-center">
-                                        {sub.status === TaskStatus.COMPLETED ? 
-                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> : 
+                                        {sub.status === TaskStatus.COMPLETED ?
+                                            <CheckCircleIcon className="w-3.5 h-3.5 mr-1.5 text-success flex-shrink-0" /> :
                                             <ClockIcon className="w-3.5 h-3.5 mr-1.5 text-yellow-400 flex-shrink-0" />
                                         }
                                         <span className={sub.status === TaskStatus.COMPLETED ? 'line-through text-text-secondary' : ''}>
@@ -617,11 +642,11 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
         </div>,
         document.getElementById('tooltip-root')!
     );
-    
+
     return (
         <div className="bg-secondary rounded-xl border border-accent overflow-hidden shadow-2xl">
             {isEditing && (
-                 <div className="p-3 bg-primary/50 border-b border-accent flex justify-between items-center animate-fadeIn sticky top-0 z-30">
+                <div className="p-3 bg-primary/50 border-b border-accent flex justify-between items-center animate-fadeIn sticky top-0 z-30">
                     <div>
                         <h4 className="font-bold text-highlight">Edit Mode</h4>
                         <p className="text-sm text-text-secondary">Drag a task bar to reschedule, reorder, or create dependencies.</p>
@@ -635,13 +660,13 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                             <UndoIcon className="w-4 h-4" />
                             <span>Undo</span>
                         </button>
-                        <button 
+                        <button
                             onClick={handleCancelChanges}
                             className="px-4 py-2 rounded-lg bg-accent text-light hover:bg-accent/80 transition-opacity font-semibold"
                         >
                             Cancel
                         </button>
-                        <button 
+                        <button
                             onClick={handleSaveChangesClick}
                             className="px-4 py-2 rounded-lg bg-success text-white hover:bg-success/90 transition-opacity font-semibold"
                         >
@@ -651,7 +676,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                 </div>
             )}
             <div className="flex text-sm">
-                <div 
+                <div
                     ref={sidebarRef}
                     className="w-72 border-r border-accent font-semibold flex-shrink-0 relative"
                     onDrop={handleSidebarDrop}
@@ -661,8 +686,8 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                     <div className="h-16 border-b border-accent flex items-center p-4 text-light bg-primary/30 sticky top-0 z-20">Task Name</div>
                     <div className="divide-y divide-accent">
                         {ganttTasks.map(task => (
-                            <div 
-                                key={task.id} 
+                            <div
+                                key={task.id}
                                 className={`h-12 p-4 flex items-center truncate transition-opacity ${draggingTaskId === task.id ? 'opacity-30' : ''}`}
                                 title={task.title}
                                 style={{ paddingLeft: `${1 + task.level * 1.5}rem` }}
@@ -672,7 +697,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                         ))}
                     </div>
                     {isEditing && dropIndicator && (
-                         <div className="absolute left-0 right-0 h-1 bg-highlight/70 rounded-full transition-all duration-100" style={{ transform: `translateY(${dropIndicator.y}px)`}} />
+                        <div className="absolute left-0 right-0 h-1 bg-highlight/70 rounded-full transition-all duration-100" style={{ transform: `translateY(${dropIndicator.y}px)` }} />
                     )}
                 </div>
 
@@ -683,22 +708,23 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                 {timelineDates.map((date, index) => {
                                     const relativeDay = dateUtils.getDaysBetween(projectStartDate, date);
                                     return (
-                                    <div key={index} className="h-16 border-b border-r border-accent flex flex-col items-center justify-center">
-                                        <span className="text-xs text-text-secondary">Day</span>
-                                        <span className="font-bold text-lg text-light">{relativeDay}</span>
-                                    </div>
-                                )})}
+                                        <div key={index} className="h-16 border-b border-r border-accent flex flex-col items-center justify-center">
+                                            <span className="text-xs text-text-secondary">Day</span>
+                                            <span className="font-bold text-lg text-light">{relativeDay}</span>
+                                        </div>
+                                    )
+                                })}
                             </div>
                         </div>
-                         <div className="relative divide-y divide-accent">
+                        <div className="relative divide-y divide-accent">
                             {ganttTasks.map((ganttTask) => {
                                 if (!ganttTask) return <div key={ganttTask.id} className="h-12"></div>;
 
-                                const offsetDays = dateUtils.getDaysBetween(chartStartDate, ganttTask.ganttStartDate) -1;
+                                const offsetDays = dateUtils.getDaysBetween(chartStartDate, ganttTask.ganttStartDate) - 1;
                                 const durationDays = dateUtils.getDaysBetween(ganttTask.ganttStartDate, ganttTask.ganttEndDate);
                                 const startDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttStartDate);
                                 const endDay = dateUtils.getDaysBetween(projectStartDate, ganttTask.ganttEndDate);
-                                
+
                                 const agentDetail = AGENT_DETAILS[ganttTask.assignedTo];
                                 if (!agentDetail) return null;
 
@@ -706,7 +732,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                 const agentBgColor = agentColor.replace('text-', 'bg-').replace('-400', '-500/70');
                                 const agentBorderColor = agentColor.replace('text-', 'border-').replace('-400', '-400');
                                 const progress = ganttTask.status === TaskStatus.COMPLETED ? 100 : (ganttTask.progress || 0);
-                                
+
                                 const isHovered = hoveredTaskId === ganttTask.id;
                                 const isRelated = relatedTaskIds.has(ganttTask.id);
                                 const isDimmed = hoveredTaskId != null && !isRelated;
@@ -717,10 +743,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                     <div key={ganttTask.id} className="h-12 relative flex items-center">
                                         <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${totalDays}, 4rem)` }}>
                                             {timelineDates.map((_, index) => {
-                                                 return <div key={index} className="h-full border-r border-accent"></div>
+                                                return <div key={index} className="h-full border-r border-accent"></div>
                                             })}
                                         </div>
-                                         {isParent ? (
+                                        {isParent ? (
                                             <div
                                                 onMouseEnter={(e) => {
                                                     setHoveredTaskId(ganttTask.id);
@@ -728,7 +754,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                                         const subTasksForTooltip = orderedTasks
                                                             .filter(t => t.parentId === ganttTask.id)
                                                             .map(t => ({ title: t.title, status: t.status }));
-                                                            
+
                                                         setTooltipData({
                                                             content: {
                                                                 prerequisites: getAllPrerequisites(ganttTask.id, orderedTasks),
@@ -754,12 +780,12 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                                 }}
                                                 title={`${ganttTask.title} (Summary Task)`}
                                             >
-                                                <div className={`absolute top-0 left-0 h-full rounded-md ${agentBgColor.replace('/70', '/40')}`} style={{ width: `${progress}%`}}></div>
+                                                <div className={`absolute top-0 left-0 h-full rounded-md ${agentBgColor.replace('/70', '/40')}`} style={{ width: `${progress}%` }}></div>
                                                 <div className={`relative h-5 w-1.5 rounded-sm ${agentBgColor.replace('/70', '')}`} />
                                                 <span className="relative truncate font-semibold text-xs px-2">{ganttTask.title}</span>
                                                 <div className={`relative h-5 w-1.5 rounded-sm ${agentBgColor.replace('/70', '')}`} />
                                             </div>
-                                         ) : (
+                                        ) : (
                                             <div
                                                 draggable={isEditing}
                                                 onDragStart={(e) => handleDragStart(e, ganttTask)}
@@ -793,10 +819,10 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick, onTa
                                                     width: `${durationDays * 4}rem`,
                                                 }}
                                             >
-                                                <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%`}}></div>
+                                                <div className="absolute top-0 left-0 h-full bg-black/20" style={{ width: `${progress}%` }}></div>
                                                 <span className="relative truncate font-semibold text-xs">{ganttTask.title}</span>
                                             </div>
-                                         )}
+                                        )}
                                     </div>
                                 );
                             })}

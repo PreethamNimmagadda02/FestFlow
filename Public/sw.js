@@ -12,6 +12,7 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Service Worker: Caching app shell');
+        self.skipWaiting();
         return cache.addAll(URLS_TO_CACHE);
       })
   );
@@ -28,7 +29,7 @@ self.addEventListener('activate', event => {
             return caches.delete(cacheName);
           }
         })
-      );
+      ).then(() => self.clients.claim());
     })
   );
 });
@@ -38,7 +39,12 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') {
     return;
   }
-  
+
+  // Ignore requests with unsupported schemes (like chrome-extension://)
+  if (!event.request.url.startsWith('http')) {
+    return;
+  }
+
   // Ignore Firestore requests.
   if (event.request.url.includes('firestore.googleapis.com')) {
     return;
@@ -54,21 +60,21 @@ self.addEventListener('fetch', event => {
 
         // If the resource is not in the cache, fetch it from the network.
         return fetch(event.request).then(networkResponse => {
-            // Check if we received a valid response to cache
-            if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
-              return networkResponse;
-            }
-
-            // Clone the response stream.
-            const responseToCache = networkResponse.clone();
-
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-
+          // Check if we received a valid response to cache
+          if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
             return networkResponse;
           }
+
+          // Clone the response stream.
+          const responseToCache = networkResponse.clone();
+
+          caches.open(CACHE_NAME)
+            .then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+
+          return networkResponse;
+        }
         );
       })
   );

@@ -8,13 +8,13 @@ import { ref, deleteObject } from 'firebase/storage';
 // This configuration is populated by environment variables.
 // Ensure your build environment is set up to provide these values.
 const firebaseConfig = {
-  apiKey: process.env.VITE_FIREBASE_API_KEY,
-  authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_FIREBASE_APP_ID,
-  measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase only if it hasn't been initialized yet.
@@ -44,16 +44,16 @@ export const deleteFileFromStorage = async (fileUrl: string): Promise<void> => {
         // Extract the storage path from the URL
         // Firebase Storage URLs are in format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?...
         const baseUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.app.options.storageBucket}/o/`;
-        
+
         if (!fileUrl.startsWith(baseUrl)) {
             // Not a Firebase Storage URL from this project, skip deletion
             return;
         }
-        
+
         // Extract and decode the path
         const encodedPath = fileUrl.substring(baseUrl.length).split('?')[0];
         const filePath = decodeURIComponent(encodedPath);
-        
+
         // Delete the file
         const fileRef = ref(storage, filePath);
         await deleteObject(fileRef);

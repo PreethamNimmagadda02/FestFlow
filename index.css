@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@source "./index.html";
+@source "./*.{js,ts,jsx,tsx}";
+@source "./components/**/*.{js,ts,jsx,tsx}";
+@source "./services/**/*.{js,ts,jsx,tsx}";
+@source "./context/**/*.{js,ts,jsx,tsx}";
+
+@theme {
+    /* Colors */
+    --color-primary: #111827;
+    --color-secondary: #1F2937;
+    --color-accent: #374151;
+    --color-highlight: #6366F1;
+    --color-light: #F9FAFB;
+    --color-text-secondary: #9CA3AF;
+    --color-success: #22C55E;
+    --color-info: #3B82F6;
+    --color-warning: #F97316;
+    --color-danger: #EF4444;
+
+    /* Fonts */
+    --font-sans: "Space Grotesk", sans-serif;
+
+    /* Animations */
+    --animate-pulse: pulse 1.5s ease-in-out infinite;
+    --animate-fadeIn: fadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    --animate-shimmer: shimmer 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-kenburns-top-left: kenburns-top-left 11s ease-out both;
+    --animate-kenburns-bottom-right: kenburns-bottom-right 11s ease-out both;
+    --animate-kenburns-center: kenburns-center 11s ease-out both;
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        50% {
+            transform: scale(1.1);
+            opacity: .7;
+        }
+    }
+
+    @keyframes fadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(15px);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes shimmer {
+        0% {
+            transform: translateX(0);
+        }
+
+        100% {
+            transform: translateX(200%);
+        }
+    }
+
+    @keyframes kenburns-top-left {
+        0% {
+            transform: scale(1) translate(0, 0);
+            transform-origin: top left;
+        }
+
+        100% {
+            transform: scale(1.15) translate(5%, 5%);
+            transform-origin: top left;
+        }
+    }
+
+    @keyframes kenburns-bottom-right {
+        0% {
+            transform: scale(1) translate(0, 0);
+            transform-origin: bottom right;
+        }
+
+        100% {
+            transform: scale(1.15) translate(-5%, -5%);
+            transform-origin: bottom right;
+        }
+    }
+
+    @keyframes kenburns-center {
+        0% {
+            transform: scale(1);
+            transform-origin: center center;
+        }
+
+        100% {
+            transform: scale(1.15);
+            transform-origin: center center;
+        }
+    }
+}

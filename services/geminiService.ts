@@ -23,7 +23,7 @@ const getAI = (): GoogleGenAI => {
     if (!ai) {
         // The API key is expected to be set as an environment variable.
         // This constructor will only be called when IS_OFFLINE is false.
-        ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY as string });
+        ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY as string });
     }
     return ai;
 };
@@ -176,7 +176,7 @@ const mockDecomposeGoal = (goal: string, userProfile: UserProfile | null): Promi
 const mockExecuteTask = (task: Task, userProfile: UserProfile | null, projectName: string | null): Promise<string> => {
     console.log(`Executing task (Comprehensive Offline Mock): "${task.title}" for event "${projectName}" by`, userProfile?.institution);
     let mockContent = "Default mock content. If you see this, the task title might not be matched in mockExecuteTask.";
-    
+
     const eventName = projectName || task.title; // Fallback to task title if project name is missing
     const institutionName = userProfile?.institution || 'Our Institution';
     const institutionHandle = institutionName.replace(/\s+/g, '');
@@ -219,7 +219,7 @@ Learn more on our new website: ${eventHandle}Conf.com #Keynote #AI #TechEvent #$
             break;
     }
 
-     return new Promise(resolve => {
+    return new Promise(resolve => {
         setTimeout(() => {
             resolve(mockContent);
         }, 1000); // Simulate network delay
@@ -254,11 +254,11 @@ const callGeminiWithRetry = async (
                 await new Promise(res => setTimeout(res, delay));
                 delay *= 2; // Exponential backoff
             } else {
-                 if (error.message && error.message.includes('429')) {
-                     throw new Error(`Rate limit exceeded. Please wait a minute and try again. (Failed after ${maxRetries} retries)`);
-                 }
-                 // Re-throw other errors immediately
-                 throw error;
+                if (error.message && error.message.includes('429')) {
+                    throw new Error(`Rate limit exceeded. Please wait a minute and try again. (Failed after ${maxRetries} retries)`);
+                }
+                // Re-throw other errors immediately
+                throw error;
             }
         }
     }
@@ -298,8 +298,8 @@ Your instructions are:
 7.  Generate a unique, URL-friendly slug for each task 'id'.
 8.  Provide a realistic 'estimatedDuration' in days for each task. The duration should be a whole number greater than 0.
 9.  You MUST return the plan as a JSON array of task objects matching the provided schema. Do not return markdown or any other text.`;
-    
-     if (userProfile && userProfile.institution) {
+
+    if (userProfile && userProfile.institution) {
         let context = `\n\nIMPORTANT CONTEXT: The user planning this event is from "${userProfile.institution}"`;
         if (userProfile.city && userProfile.state) {
             context += `, located in ${userProfile.city}, ${userProfile.state}.`;
@@ -327,7 +327,7 @@ Your instructions are:
                 type: Type.NUMBER,
                 description: "The estimated number of days this task will take to complete (must be a whole number greater than 0)."
             },
-            parentId: { 
+            parentId: {
                 type: Type.STRING,
                 description: "Optional. The ID of the parent task if this is a sub-task."
             },
@@ -355,7 +355,7 @@ Your instructions are:
 
         const jsonStr = response.text.trim();
         const decomposedTasks = JSON.parse(jsonStr) as Task[];
-        
+
         // Post-processing to flatten any accidentally nested sub-tasks to enforce a single level of hierarchy.
         const taskMapForFlattening = new Map(decomposedTasks.map(t => [t.id, t]));
         decomposedTasks.forEach(task => {
@@ -442,10 +442,10 @@ export const getInstitutionDetails = async (institutionName: string): Promise<In
     const schema = {
         type: Type.OBJECT,
         properties: {
-            city: { 
-                type: Type.STRING, 
+            city: {
+                type: Type.STRING,
                 // Refined description for clarity.
-                description: "The official city name where the institution is located. Exclude any neighborhoods, districts, or specific localities." 
+                description: "The official city name where the institution is located. Exclude any neighborhoods, districts, or specific localities."
             },
             state: { type: Type.STRING, description: "The state, province, or region where the institution is located." },
             pincode: { type: Type.STRING, description: "The pincode or ZIP code for the institution's address." },
@@ -557,9 +557,9 @@ export const executeTask = async (task: Task, userProfile: UserProfile | null, p
     } else {
         return Promise.reject(new Error(`Task execution failed: The agent ${task.assignedTo} does not generate approvable content.`));
     }
-    
+
     let context = `\n\nIMPORTANT CONTEXT: You are generating content for an event named "${projectName || 'the event'}".`;
-    
+
     if (userProfile && userProfile.institution) {
         context += ` This event is being organized by "${userProfile.institution}"`;
         if (userProfile.city && userProfile.state) {
@@ -568,9 +568,9 @@ export const executeTask = async (task: Task, userProfile: UserProfile | null, p
         context += ` Personalize the content to reflect this. Mention the institution's name, reference local culture if appropriate, and adopt a tone suitable for the institution (e.g., academic and vibrant for a college, professional and formal for a corporation).`;
     }
     systemInstruction += context;
-    
+
     // Use custom prompt if provided, otherwise construct from task details
-    const prompt = task.customPrompt 
+    const prompt = task.customPrompt
         ? task.customPrompt
         : `Generate content based on the following task:
     - Task Title: "${task.title}"
